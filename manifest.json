@@ -1,0 +1,30 @@
+{
+  "name": "UGAT Personal Tracker",
+  "short_name": "UGAT Tracker",
+  "start_url": "./index.html",
+  "scope": ".",
+  "display": "standalone",
+  "background_color": "#10142A",
+  "theme_color": "#10142A",
+  "description": "Daily routine, practice log, and syllabus tracker for UGAT prep.",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
