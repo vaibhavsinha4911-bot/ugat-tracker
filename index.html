@@ -193,6 +193,10 @@
       <h2 class="serif text-lg mb-1" style="color:var(--paper);">Practice log</h2>
       <p class="text-[12.5px] mb-4" style="color:var(--muted);">Questions attempted today, by section.</p>
       <div id="counterList" class="divide-y" style="border-top:1px solid var(--line); border-bottom:1px solid var(--line);"></div>
+      <div class="flex items-center justify-between mt-4">
+        <p class="text-[11.5px]" style="color:var(--muted);">Saves automatically, but tap to confirm.</p>
+        <button id="saveCountersBtn" class="text-[13px] px-4 py-2" style="border:1px solid var(--gold-dim); color:var(--gold);">Save</button>
+      </div>
     </section>
 
     <section class="pt-10">
@@ -216,6 +220,25 @@
     <section class="pt-6">
       <h2 class="serif text-lg mb-1" style="color:var(--paper);">Your record</h2>
       <p class="text-[12.5px] mb-5" style="color:var(--muted);">Every day you've worked the routine, with completion time.</p>
+
+      <div class="mb-6 pb-5" style="border-bottom:1px solid var(--line);">
+        <p class="text-[12px] mb-3" style="color:var(--muted);">Total questions practiced, all-time</p>
+        <div class="grid grid-cols-3 gap-2">
+          <div class="text-center">
+            <p class="serif text-xl" id="totalQuantsEl" style="color:var(--gold);">0</p>
+            <p class="text-[11px] mt-0.5" style="color:var(--muted);">Quants</p>
+          </div>
+          <div class="text-center" style="border-left:1px solid var(--line); border-right:1px solid var(--line);">
+            <p class="serif text-xl" id="totalReasoningEl" style="color:var(--gold);">0</p>
+            <p class="text-[11px] mt-0.5" style="color:var(--muted);">Reasoning</p>
+          </div>
+          <div class="text-center">
+            <p class="serif text-xl" id="totalVerbalEl" style="color:var(--gold);">0</p>
+            <p class="text-[11px] mt-0.5" style="color:var(--muted);">Verbal</p>
+          </div>
+        </div>
+      </div>
+
       <div id="historyList"></div>
       <p id="historyEmpty" class="text-[13px] pt-6" style="color:var(--muted); display:none;">Nothing logged yet — finish today's routine to start your record.</p>
     </section>
@@ -378,21 +401,31 @@
   var state = load();
   rollOverDayIfNeeded();
 
-  function snapshotHistoryFor(dateStr, tasksArr, completed){
+  function upsertHistoryEntry(dateStr, patch){
+    var existing = state.historyByDate[dateStr] || { pct:0, completedAt:null, counters:{ quants:0, reasoning:0, verbal:0 } };
+    var mergedCounters = Object.assign({}, existing.counters || { quants:0, reasoning:0, verbal:0 }, patch.counters || {});
+    state.historyByDate[dateStr] = Object.assign({}, existing, patch, { counters: mergedCounters });
+  }
+
+  function snapshotHistoryFor(dateStr, tasksArr, completed, countersSnapshot){
     var total = tasksArr.length;
     var done = tasksArr.filter(function(t){ return t.done; }).length;
     var pct = total ? Math.round((done/total)*100) : 0;
-    state.historyByDate[dateStr] = {
-      pct: pct,
-      completedAt: completed ? (state.completionTimes[dateStr] || null) : (state.historyByDate[dateStr] ? state.historyByDate[dateStr].completedAt : null)
-    };
+    var patch = { pct: pct };
+    if(completed){ patch.completedAt = state.completionTimes[dateStr] || null; }
+    if(countersSnapshot){ patch.counters = countersSnapshot; }
+    upsertHistoryEntry(dateStr, patch);
   }
 
   function rollOverDayIfNeeded(){
     var today = todayStr();
 
     if(state.dailyTaskDate !== today){
-      snapshotHistoryFor(state.dailyTaskDate, state.tasks, state.completedToday);
+      snapshotHistoryFor(state.dailyTaskDate, state.tasks, state.completedToday, {
+        quants: state.counters.quants || 0,
+        reasoning: state.counters.reasoning || 0,
+        verbal: state.counters.verbal || 0
+      });
 
       if(state.lastCompletedDate && state.lastCompletedDate !== today && state.lastCompletedDate !== yesterdayStr()){
         state.streak = 0;
@@ -587,12 +620,24 @@
       plus.textContent = "+";
       plus.setAttribute("aria-label","Increase " + COUNTER_META[key].label + " count");
 
+      function syncCounterHistory(){
+        upsertHistoryEntry(todayStr(), {
+          counters: {
+            quants: state.counters.quants || 0,
+            reasoning: state.counters.reasoning || 0,
+            verbal: state.counters.verbal || 0
+          }
+        });
+        if(historyView.classList.contains("active")) renderHistory();
+      }
+
       minus.addEventListener("click", function(){
         if((state.counters[key]||0) <= 0) return;
         state.counters[key] -= 1;
         state.totals[key] = Math.max(0, (state.totals[key]||0) - 1);
         countEl.textContent = state.counters[key];
         sub.textContent = (state.totals[key]||0) + " total practiced";
+        syncCounterHistory();
         save();
       });
       plus.addEventListener("click", function(){
@@ -600,6 +645,7 @@
         state.totals[key] = (state.totals[key]||0) + 1;
         countEl.textContent = state.counters[key];
         sub.textContent = (state.totals[key]||0) + " total practiced";
+        syncCounterHistory();
         save();
       });
 
@@ -786,8 +832,19 @@
   // ---------- HISTORY ----------
   var historyList = document.getElementById("historyList");
   var historyEmpty = document.getElementById("historyEmpty");
+  var totalQuantsEl = document.getElementById("totalQuantsEl");
+  var totalReasoningEl = document.getElementById("totalReasoningEl");
+  var totalVerbalEl = document.getElementById("totalVerbalEl");
+
+  function renderHistoryTotals(){
+    totalQuantsEl.textContent = state.totals.quants || 0;
+    totalReasoningEl.textContent = state.totals.reasoning || 0;
+    totalVerbalEl.textContent = state.totals.verbal || 0;
+  }
 
   function renderHistory(){
+    renderHistoryTotals();
+
     var dates = Object.keys(state.historyByDate).sort(function(a,b){ return a < b ? 1 : -1; });
     historyList.innerHTML = "";
 
@@ -799,8 +856,12 @@
 
     dates.forEach(function(dateStr){
       var entry = state.historyByDate[dateStr];
+      var counters = entry.counters || { quants:0, reasoning:0, verbal:0 };
       var row = document.createElement("div");
-      row.className = "history-row flex items-center justify-between py-3.5";
+      row.className = "history-row py-3.5";
+
+      var topRow = document.createElement("div");
+      topRow.className = "flex items-center justify-between";
 
       var left = document.createElement("div");
       left.className = "flex items-center gap-2.5";
@@ -828,11 +889,32 @@
       pctLabel.style.color = barColor(entry.pct);
       pctLabel.textContent = entry.pct + "%";
 
-      row.appendChild(left);
-      row.appendChild(pctLabel);
+      topRow.appendChild(left);
+      topRow.appendChild(pctLabel);
+      row.appendChild(topRow);
+
+      var qLine = document.createElement("p");
+      qLine.className = "text-[11.5px] mt-2 pl-[18px]";
+      qLine.style.color = "var(--muted)";
+      qLine.textContent = "Quants " + (counters.quants||0) + " · Reasoning " + (counters.reasoning||0) + " · Verbal " + (counters.verbal||0);
+      row.appendChild(qLine);
+
       historyList.appendChild(row);
     });
   }
+
+  document.getElementById("saveCountersBtn").addEventListener("click", function(){
+    upsertHistoryEntry(todayStr(), {
+      counters: {
+        quants: state.counters.quants || 0,
+        reasoning: state.counters.reasoning || 0,
+        verbal: state.counters.verbal || 0
+      }
+    });
+    save();
+    showToast("Saved");
+    if(historyView.classList.contains("active")) renderHistory();
+  });
 
   // ---------- init ----------
   renderTasks();
