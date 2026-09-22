@@ -1,0 +1,1104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>UGAT Personal Tracker</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#10142A">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="UGAT Tracker">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  :root{
+    --ink:#10142A;
+    --ink-2:#181D3A;
+    --ink-3:#232A50;
+    --line:#333B66;
+    --paper:#F3EFE4;
+    --paper-dim:#B9BCD6;
+    --muted:#7A81A8;
+    --gold:#E4A93B;
+    --gold-dim:#8A6F33;
+    --red:#DD5B4E;
+    --amber:#E3A63C;
+    --green:#4CA57A;
+    box-sizing:border-box;
+    padding-top:env(safe-area-inset-top,0px);
+    padding-bottom:env(safe-area-inset-bottom,0px);
+  }
+  *{box-sizing:border-box;}
+  html{scroll-padding-top:env(safe-area-inset-top,0px);}
+  html,body{height:100%;}
+  body{
+    background:var(--ink);
+    color:var(--paper);
+    font-family:'Inter',ui-sans-serif,system-ui,sans-serif;
+    -webkit-tap-highlight-color:transparent;
+    overflow-x:hidden;
+  }
+  .serif{font-family:'Fraunces',serif;}
+  ::selection{background:var(--gold);color:var(--ink);}
+
+  .chk{
+    appearance:none;-webkit-appearance:none;
+    width:22px;height:22px;min-width:22px;
+    border:1.5px solid var(--muted);
+    border-radius:5px;
+    background:transparent;
+    display:inline-grid;place-content:center;
+    cursor:pointer;
+    transition:border-color .15s ease, background .15s ease;
+  }
+  .chk.sm{width:19px;height:19px;min-width:19px;}
+  .chk:checked{background:var(--gold);border-color:var(--gold);}
+  .chk::before{
+    content:"";
+    width:12px;height:9px;
+    clip-path:polygon(10% 45%, 40% 75%, 100% 10%, 90% 0%, 40% 55%, 20% 35%);
+    background:var(--ink);
+    transform:scale(0);
+    transition:transform .12s ease;
+  }
+  .chk.sm::before{width:10px;height:7.5px;}
+  .chk:checked::before{transform:scale(1);}
+
+  .task-label{transition:color .15s ease, opacity .15s ease;}
+  .task-done .task-label{color:var(--muted);text-decoration:line-through;text-decoration-color:var(--muted);opacity:.75;}
+
+  .bar-track{background:#1B2044;border:1px solid var(--line);}
+  .bar-fill{transition:width .5s cubic-bezier(.4,0,.2,1), background-color .5s ease;}
+
+  .stepper-btn{
+    width:38px;height:38px;
+    display:grid;place-content:center;
+    border:1px solid var(--line);
+    color:var(--paper);
+    font-size:20px;line-height:1;
+    -webkit-user-select:none;user-select:none;
+    transition:background .12s ease, transform .08s ease;
+  }
+  .stepper-btn:active{transform:scale(.92);background:var(--ink-3);}
+
+  input[type="text"]::placeholder{color:var(--muted);}
+
+  .fire{display:inline-block;animation:flicker 2.4s ease-in-out infinite;}
+  @keyframes flicker{
+    0%,100%{transform:scale(1) rotate(0deg);}
+    50%{transform:scale(1.08) rotate(-2deg);}
+  }
+  @media (prefers-reduced-motion: reduce){
+    .fire{animation:none;}
+    .bar-fill{transition:none;}
+  }
+
+  .subject-panel{max-height:0;overflow:hidden;transition:max-height .35s ease;}
+  .subject-panel.open{max-height:2200px;}
+
+  .chev{transition:transform .25s ease;}
+  .chev.open{transform:rotate(180deg);}
+
+  .tab-btn{
+    flex:1;
+    text-align:center;
+    padding:10px 0;
+    font-size:13.5px;
+    letter-spacing:.01em;
+    color:var(--muted);
+    border-bottom:2px solid transparent;
+    transition:color .15s ease, border-color .15s ease;
+  }
+  .tab-btn.active{color:var(--gold);border-color:var(--gold);}
+
+  .view{display:none;}
+  .view.active{display:block;}
+
+  .toast{
+    position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));
+    transform:translateX(-50%) translateY(20px);
+    background:var(--paper);color:var(--ink);
+    padding:10px 18px;border-radius:999px;
+    font-size:13px;font-weight:600;
+    opacity:0;pointer-events:none;
+    transition:opacity .25s ease, transform .25s ease;
+    z-index:50;
+    white-space:nowrap;
+  }
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+  .history-row{border-bottom:1px solid var(--line);}
+  .dot{width:8px;height:8px;border-radius:50%;display:inline-block;}
+</style>
+</head>
+<body class="min-h-full">
+
+<header class="sticky top-0 z-20" style="padding-top:env(safe-area-inset-top,0px); background:var(--ink); border-bottom:1px solid var(--line);">
+  <div class="max-w-md mx-auto px-5 pt-4">
+    <div class="flex items-center justify-between">
+      <div>
+        <p class="serif text-[20px] leading-none" style="color:var(--paper);">UGAT Personal Tracker</p>
+        <p class="text-[12px] mt-1" style="color:var(--muted);" id="todayDateLabel">&nbsp;</p>
+      </div>
+      <div class="flex items-center gap-1.5 pl-3 pr-3.5 py-1.5" style="border:1px solid var(--line);">
+        <span class="fire text-lg">🔥</span>
+        <span class="serif text-xl" id="streakCount" style="color:var(--gold);">0</span>
+        <span class="text-[11px] mt-0.5" style="color:var(--muted);">day streak</span>
+      </div>
+    </div>
+
+    <p class="serif text-[15.5px] mt-4 mb-3 leading-snug" style="color:var(--gold);">
+      Make today count, Vaibhav! <span style="color:var(--paper);">The scoreboard never lies.</span>
+    </p>
+
+    <div class="flex" style="border-top:1px solid var(--line);">
+      <button class="tab-btn active" id="tabDashboardBtn">Dashboard</button>
+      <button class="tab-btn" id="tabHistoryBtn">History</button>
+      <button class="tab-btn" id="tabTrackBtn">My Track</button>
+    </div>
+  </div>
+</header>
+
+<main class="max-w-md mx-auto px-5 pb-16">
+
+  <!-- ===================== DASHBOARD VIEW ===================== -->
+  <div id="dashboardView" class="view active">
+
+    <section class="pt-6">
+      <div class="flex items-baseline justify-between mb-3">
+        <h2 class="serif text-lg" style="color:var(--paper);">Today's routine</h2>
+        <span class="text-[13px] serif" id="dailyPct" style="color:var(--muted);">0%</span>
+      </div>
+
+      <div class="bar-track h-2.5 w-full overflow-hidden">
+        <div class="bar-fill h-full" id="dailyBarFill" style="width:0%; background:var(--red);"></div>
+      </div>
+
+      <p class="text-[12.5px] mt-2" style="color:var(--muted);" id="dailyStatusLine">Nothing checked off yet.</p>
+
+      <ul id="taskList" class="mt-5 space-y-0"></ul>
+
+      <form id="addTaskForm" class="flex items-center gap-2 mt-4 pt-4" style="border-top:1px solid var(--line);">
+        <input id="addTaskInput" type="text" placeholder="Add a routine item…"
+          class="flex-1 bg-transparent outline-none text-[14.5px] py-2" style="color:var(--paper); border-bottom:1px solid var(--line);">
+        <button type="submit" class="text-[13px] px-3 py-2 shrink-0" style="border:1px solid var(--gold-dim); color:var(--gold);">Add</button>
+      </form>
+    </section>
+
+    <section class="pt-10">
+      <h2 class="serif text-lg mb-1" style="color:var(--paper);">Practice log</h2>
+      <p class="text-[12.5px] mb-4" style="color:var(--muted);">Questions attempted today, by section.</p>
+      <div id="counterList" class="divide-y" style="border-top:1px solid var(--line); border-bottom:1px solid var(--line);"></div>
+      <div class="flex items-center justify-between mt-4">
+        <p class="text-[11.5px]" style="color:var(--muted);">Saves automatically, but tap to confirm.</p>
+        <button id="saveCountersBtn" class="text-[13px] px-4 py-2" style="border:1px solid var(--gold-dim); color:var(--gold);">Save</button>
+      </div>
+    </section>
+
+    <section class="pt-10">
+      <div class="flex items-baseline justify-between mb-1">
+        <h2 class="serif text-lg" style="color:var(--paper);">Syllabus covered</h2>
+        <span class="serif text-2xl" id="syllabusPct" style="color:var(--gold);">0%</span>
+      </div>
+      <p class="text-[12.5px] mb-3" style="color:var(--muted);" id="syllabusSub">0 of 0 topics marked done</p>
+      <div class="bar-track h-2.5 w-full overflow-hidden mb-6">
+        <div class="bar-fill h-full" id="syllabusBarFill" style="width:0%; background:var(--gold);"></div>
+      </div>
+
+      <div id="subjectAccordion" class="space-y-0" style="border-top:1px solid var(--line);"></div>
+    </section>
+
+    <p class="text-[11.5px] text-center pt-12" style="color:var(--muted);">Everything on this page is stored only on this phone.</p>
+  </div>
+
+  <!-- ===================== HISTORY VIEW ===================== -->
+  <div id="historyView" class="view">
+    <section class="pt-6">
+      <h2 class="serif text-lg mb-1" style="color:var(--paper);">Your record</h2>
+      <p class="text-[12.5px] mb-5" style="color:var(--muted);">Every day you've worked the routine, with completion time.</p>
+
+      <div class="mb-6 pb-5" style="border-bottom:1px solid var(--line);">
+        <p class="text-[12px] mb-3" style="color:var(--muted);">Total questions practiced, all-time</p>
+        <div class="grid grid-cols-3 gap-2">
+          <div class="text-center">
+            <p class="serif text-xl" id="totalQuantsEl" style="color:var(--gold);">0</p>
+            <p class="text-[11px] mt-0.5" style="color:var(--muted);">Quants</p>
+          </div>
+          <div class="text-center" style="border-left:1px solid var(--line); border-right:1px solid var(--line);">
+            <p class="serif text-xl" id="totalReasoningEl" style="color:var(--gold);">0</p>
+            <p class="text-[11px] mt-0.5" style="color:var(--muted);">Reasoning</p>
+          </div>
+          <div class="text-center">
+            <p class="serif text-xl" id="totalVerbalEl" style="color:var(--gold);">0</p>
+            <p class="text-[11px] mt-0.5" style="color:var(--muted);">Verbal</p>
+          </div>
+        </div>
+      </div>
+
+      <div id="historyList"></div>
+      <p id="historyEmpty" class="text-[13px] pt-6" style="color:var(--muted); display:none;">Nothing logged yet — finish today's routine to start your record.</p>
+    </section>
+  </div>
+
+  <!-- ===================== MY TRACK VIEW ===================== -->
+  <div id="trackView" class="view">
+    <section class="pt-6">
+      <h2 class="serif text-lg mb-1" style="color:var(--paper);">My Track</h2>
+      <p class="text-[12.5px] mb-5" style="color:var(--muted);">Question practice by section, and your overall daily progress — last 14 days.</p>
+
+      <div class="mb-4">
+        <div class="flex items-center justify-between mb-3">
+          <h3 class="serif text-[15px]" style="color:var(--paper);">Questions practiced</h3>
+        </div>
+        <div class="flex items-center gap-4 mb-3 flex-wrap">
+          <span class="flex items-center gap-1.5 text-[11.5px]" style="color:var(--muted);"><span class="dot" style="background:#E4A93B;"></span>Quants</span>
+          <span class="flex items-center gap-1.5 text-[11.5px]" style="color:var(--muted);"><span class="dot" style="background:#4FA3E3;"></span>Reasoning</span>
+          <span class="flex items-center gap-1.5 text-[11.5px]" style="color:var(--muted);"><span class="dot" style="background:#E85D8A;"></span>Verbal</span>
+        </div>
+        <div id="trackBarChart" class="pt-1 pb-2" style="border-bottom:1px solid var(--line);"></div>
+      </div>
+
+      <div class="mb-4 pt-6">
+        <div class="flex items-center justify-between mb-3">
+          <h3 class="serif text-[15px]" style="color:var(--paper);">Overall daily progress</h3>
+          <span class="flex items-center gap-1.5 text-[11.5px]" style="color:var(--muted);"><span class="dot" style="background:var(--green);"></span>Routine %</span>
+        </div>
+        <div id="trackLineChart" class="pt-1 pb-2" style="border-bottom:1px solid var(--line);"></div>
+      </div>
+
+      <p id="trackEmpty" class="text-[13px] pt-6" style="color:var(--muted); display:none;">Log a few days of practice to see your trend here.</p>
+    </section>
+  </div>
+
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+  "use strict";
+
+  var STORAGE_KEY = "ugatPrepDashboard_v2";
+  var OLD_STORAGE_KEY = "ugatPrepDashboard_v1";
+
+  // Topics can be plain strings, or { label, subtopics:[...] } for a topic broken into checkable sub-items.
+  var SUBJECTS = [
+    { key:"quants", label:"Quantitative Ability", topics:[
+      "Number Systems","Percentages","Profit & Loss","Ratio & Proportion",
+      "Time, Speed & Distance","Time & Work","Averages & Mixtures",
+      "Simple & Compound Interest","Algebra (Linear & Quadratic)",
+      "Set Theory & Functions","Permutation & Combination","Probability",
+      "Geometry & Mensuration","Coordinate Geometry","Differential Calculus",
+      "Integral Calculus","Matrices & Determinants","Sequence & Series",
+      "Statistics","Binomial Theorem","Data Interpretation"
+    ]},
+    { key:"reasoning", label:"Logical Reasoning", topics:[
+      "Blood Relations","Coding–Decoding","Number & Letter Series",
+      "Syllogisms","Seating Arrangement","Puzzles & Grouping",
+      "Direction Sense","Statement & Assumption","Data Sufficiency",
+      "Venn Diagrams","Clocks & Calendars"
+    ]},
+    { key:"verbal", label:"Verbal Ability", topics:[
+      "Reading Comprehension","Synonyms & Antonyms","Para Jumbles",
+      "Sentence Correction",
+      { label:"Fill in the Blanks", subtopics:[
+        "Tenses","Speech","Voice","SV Agreement","Parallel Structures","Parts of Speech"
+      ]},
+      "Idioms & Phrasal Verbs","Critical Reasoning","Verbal Analogies",
+      "One-word Substitution","Error Spotting"
+    ]}
+  ];
+
+  var DEFAULT_TASKS = [
+    "Wake up by 6 AM",
+    "Solve one Quant practice set",
+    "Solve one Reasoning practice set",
+    "Read for 30 minutes",
+    "Complete a lecture / video session",
+    "Open shop for Mom at 1:30 PM",
+    "Digital marketing course — 1 session"
+  ];
+
+  function todayStr(d){
+    d = d || new Date();
+    return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0");
+  }
+  function yesterdayOf(dateStr){
+    var d = new Date(dateStr + "T00:00:00");
+    d.setDate(d.getDate()-1);
+    return todayStr(d);
+  }
+  function yesterdayStr(){ return yesterdayOf(todayStr()); }
+  function uid(){ return Math.random().toString(36).slice(2,10); }
+  function timeNow(){
+    return new Date().toLocaleTimeString(undefined, { hour:"numeric", minute:"2-digit" });
+  }
+  function prettyDate(dateStr){
+    var d = new Date(dateStr + "T00:00:00");
+    return d.toLocaleDateString(undefined, { weekday:"short", month:"short", day:"numeric" });
+  }
+
+  function buildSyllabusFromDefaults(existing){
+    var out = {};
+    SUBJECTS.forEach(function(s){
+      var existingList = (existing && existing[s.key]) || [];
+      var existingByLabel = {};
+      existingList.forEach(function(item){ existingByLabel[item.label] = item; });
+
+      out[s.key] = s.topics.map(function(topicDef){
+        if(typeof topicDef === "string"){
+          var prev = existingByLabel[topicDef];
+          var done = (prev && typeof prev.done === "boolean") ? prev.done : false;
+          return { id: uid(), label: topicDef, done: done };
+        } else {
+          var prevParent = existingByLabel[topicDef.label];
+          var prevSubsByLabel = {};
+          if(prevParent && prevParent.subtopics){
+            prevParent.subtopics.forEach(function(st){ prevSubsByLabel[st.label] = st; });
+          }
+          var subtopics = topicDef.subtopics.map(function(subLabel){
+            var prevSub = prevSubsByLabel[subLabel];
+            var subDone = (prevSub && typeof prevSub.done === "boolean") ? prevSub.done : false;
+            return { id: uid(), label: subLabel, done: subDone };
+          });
+          return { id: uid(), label: topicDef.label, subtopics: subtopics };
+        }
+      });
+    });
+    return out;
+  }
+
+  function defaultState(){
+    return {
+      dailyTaskDate: todayStr(),
+      tasks: DEFAULT_TASKS.map(function(t){ return { id: uid(), label:t, done:false }; }),
+      completedToday: false,
+      streak: 0,
+      lastCompletedDate: null,
+      countersDate: todayStr(),
+      counters: { quants:0, reasoning:0, verbal:0 },
+      totals: { quants:0, reasoning:0, verbal:0 },
+      syllabus: buildSyllabusFromDefaults(null),
+      openSubject: null,
+      completionTimes: {},
+      historyByDate: {}
+    };
+  }
+
+  function migrateFromV1(){
+    try{
+      var raw = localStorage.getItem(OLD_STORAGE_KEY);
+      if(!raw) return null;
+      return JSON.parse(raw);
+    }catch(e){ return null; }
+  }
+
+  function load(){
+    try{
+      var raw = localStorage.getItem(STORAGE_KEY);
+      var parsed = raw ? JSON.parse(raw) : migrateFromV1();
+      if(!parsed) return defaultState();
+
+      var fresh = defaultState();
+      parsed.tasks = (parsed.tasks && parsed.tasks.length) ? parsed.tasks : fresh.tasks;
+      parsed.counters = parsed.counters || fresh.counters;
+      parsed.totals = parsed.totals || fresh.totals;
+      parsed.completionTimes = parsed.completionTimes || {};
+      parsed.historyByDate = parsed.historyByDate || {};
+      parsed.syllabus = buildSyllabusFromDefaults(parsed.syllabus);
+      if(typeof parsed.streak !== "number") parsed.streak = 0;
+      if(typeof parsed.completedToday !== "boolean") parsed.completedToday = false;
+      return parsed;
+    }catch(e){
+      console.error("Load failed, starting fresh.", e);
+      return defaultState();
+    }
+  }
+
+  function save(){
+    try{
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    }catch(e){
+      console.error("Could not save — storage may be full or blocked.", e);
+      showToast("Couldn't save — storage may be blocked");
+    }
+  }
+
+  var state = load();
+  rollOverDayIfNeeded();
+
+  function upsertHistoryEntry(dateStr, patch){
+    var existing = state.historyByDate[dateStr] || { pct:0, completedAt:null, counters:{ quants:0, reasoning:0, verbal:0 } };
+    var mergedCounters = Object.assign({}, existing.counters || { quants:0, reasoning:0, verbal:0 }, patch.counters || {});
+    state.historyByDate[dateStr] = Object.assign({}, existing, patch, { counters: mergedCounters });
+  }
+
+  function snapshotHistoryFor(dateStr, tasksArr, completed, countersSnapshot){
+    var total = tasksArr.length;
+    var done = tasksArr.filter(function(t){ return t.done; }).length;
+    var pct = total ? Math.round((done/total)*100) : 0;
+    var patch = { pct: pct };
+    if(completed){ patch.completedAt = state.completionTimes[dateStr] || null; }
+    if(countersSnapshot){ patch.counters = countersSnapshot; }
+    upsertHistoryEntry(dateStr, patch);
+  }
+
+  function rollOverDayIfNeeded(){
+    var today = todayStr();
+
+    if(state.dailyTaskDate !== today){
+      snapshotHistoryFor(state.dailyTaskDate, state.tasks, state.completedToday, {
+        quants: state.counters.quants || 0,
+        reasoning: state.counters.reasoning || 0,
+        verbal: state.counters.verbal || 0
+      });
+
+      if(state.lastCompletedDate && state.lastCompletedDate !== today && state.lastCompletedDate !== yesterdayStr()){
+        state.streak = 0;
+      }
+      state.tasks.forEach(function(t){ t.done = false; });
+      state.dailyTaskDate = today;
+      state.completedToday = false;
+    }
+    if(state.countersDate !== today){
+      state.counters = { quants:0, reasoning:0, verbal:0 };
+      state.countersDate = today;
+    }
+    save();
+  }
+
+  var toastTimer = null;
+  function showToast(msg){
+    var el = document.getElementById("toast");
+    el.textContent = msg;
+    el.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function(){ el.classList.remove("show"); }, 1800);
+  }
+
+  document.getElementById("todayDateLabel").textContent = new Date().toLocaleDateString(undefined, { weekday:"long", month:"long", day:"numeric" });
+
+  // ---------- TABS ----------
+  var tabDashboardBtn = document.getElementById("tabDashboardBtn");
+  var tabHistoryBtn = document.getElementById("tabHistoryBtn");
+  var tabTrackBtn = document.getElementById("tabTrackBtn");
+  var dashboardView = document.getElementById("dashboardView");
+  var historyView = document.getElementById("historyView");
+  var trackView = document.getElementById("trackView");
+
+  function showTab(name){
+    var isDash = name === "dashboard";
+    var isHistory = name === "history";
+    var isTrack = name === "track";
+    dashboardView.classList.toggle("active", isDash);
+    historyView.classList.toggle("active", isHistory);
+    trackView.classList.toggle("active", isTrack);
+    tabDashboardBtn.classList.toggle("active", isDash);
+    tabHistoryBtn.classList.toggle("active", isHistory);
+    tabTrackBtn.classList.toggle("active", isTrack);
+    if(isHistory) renderHistory();
+    if(isTrack) renderTrack();
+  }
+  tabDashboardBtn.addEventListener("click", function(){ showTab("dashboard"); });
+  tabHistoryBtn.addEventListener("click", function(){ showTab("history"); });
+  tabTrackBtn.addEventListener("click", function(){ showTab("track"); });
+
+  // ---------- DAILY TASKS ----------
+  var taskList = document.getElementById("taskList");
+  var dailyBarFill = document.getElementById("dailyBarFill");
+  var dailyPct = document.getElementById("dailyPct");
+  var dailyStatusLine = document.getElementById("dailyStatusLine");
+  var streakCountEl = document.getElementById("streakCount");
+
+  function barColor(pct){
+    if(pct < 40) return "var(--red)";
+    if(pct < 75) return "var(--amber)";
+    return "var(--green)";
+  }
+
+  function renderTasks(){
+    taskList.innerHTML = "";
+    state.tasks.forEach(function(task){
+      var li = document.createElement("li");
+      li.className = "flex items-center gap-3 py-2.5" + (task.done ? " task-done" : "");
+      li.style.borderBottom = "1px solid var(--line)";
+
+      var cb = document.createElement("input");
+      cb.type = "checkbox";
+      cb.className = "chk";
+      cb.checked = task.done;
+      cb.addEventListener("change", function(){
+        task.done = cb.checked;
+        save();
+        renderDailyProgress();
+        li.classList.toggle("task-done", task.done);
+      });
+
+      var label = document.createElement("span");
+      label.className = "task-label text-[14.5px] flex-1";
+      label.style.color = "var(--paper)";
+      label.textContent = task.label;
+
+      var del = document.createElement("button");
+      del.setAttribute("aria-label","Remove task");
+      del.className = "text-[16px] px-1";
+      del.style.color = "var(--muted)";
+      del.textContent = "×";
+      del.addEventListener("click", function(){
+        state.tasks = state.tasks.filter(function(t){ return t.id !== task.id; });
+        save();
+        renderTasks();
+        renderDailyProgress();
+      });
+
+      li.appendChild(cb);
+      li.appendChild(label);
+      li.appendChild(del);
+      taskList.appendChild(li);
+    });
+  }
+
+  function renderDailyProgress(){
+    var total = state.tasks.length;
+    var done = state.tasks.filter(function(t){ return t.done; }).length;
+    var pct = total ? Math.round((done/total)*100) : 0;
+
+    dailyBarFill.style.width = pct + "%";
+    dailyBarFill.style.background = barColor(pct);
+    dailyPct.textContent = pct + "%";
+
+    if(total === 0){
+      dailyStatusLine.textContent = "Add your first routine item below.";
+    } else if(pct === 0){
+      dailyStatusLine.textContent = "Nothing checked off yet.";
+    } else if(pct < 100){
+      dailyStatusLine.textContent = done + " of " + total + " done — keep going.";
+    } else {
+      dailyStatusLine.textContent = "Full day logged. Streak extended.";
+    }
+
+    var today = todayStr();
+    if(total > 0 && pct === 100 && !state.completedToday){
+      state.completedToday = true;
+      state.completionTimes[today] = timeNow();
+      if(state.lastCompletedDate === yesterdayStr()){
+        state.streak += 1;
+      } else if(state.lastCompletedDate !== today){
+        state.streak = 1;
+      }
+      state.lastCompletedDate = today;
+      showToast("Day complete — streak is now " + state.streak);
+    } else if(pct < 100 && state.completedToday){
+      state.completedToday = false;
+    }
+    streakCountEl.textContent = state.streak;
+
+    snapshotHistoryFor(today, state.tasks, state.completedToday);
+    save();
+    if(historyView.classList.contains("active")) renderHistory();
+  }
+
+  document.getElementById("addTaskForm").addEventListener("submit", function(e){
+    e.preventDefault();
+    var input = document.getElementById("addTaskInput");
+    var val = input.value.trim();
+    if(!val) return;
+    state.tasks.push({ id: uid(), label: val, done:false });
+    input.value = "";
+    save();
+    renderTasks();
+    renderDailyProgress();
+  });
+
+  // ---------- PRACTICE COUNTERS ----------
+  var counterList = document.getElementById("counterList");
+  var COUNTER_META = {
+    quants:    { label:"Quantitative Ability" },
+    reasoning: { label:"Logical Reasoning" },
+    verbal:    { label:"Verbal Ability" }
+  };
+
+  function renderCounters(){
+    counterList.innerHTML = "";
+    Object.keys(COUNTER_META).forEach(function(key){
+      var row = document.createElement("div");
+      row.className = "flex items-center justify-between py-4";
+
+      var left = document.createElement("div");
+      var title = document.createElement("p");
+      title.className = "text-[14.5px]";
+      title.style.color = "var(--paper)";
+      title.textContent = COUNTER_META[key].label;
+      var sub = document.createElement("p");
+      sub.className = "text-[12px] mt-0.5";
+      sub.style.color = "var(--muted)";
+      sub.textContent = (state.totals[key]||0) + " total practiced";
+      left.appendChild(title);
+      left.appendChild(sub);
+
+      var right = document.createElement("div");
+      right.className = "flex items-center gap-3";
+
+      var minus = document.createElement("button");
+      minus.className = "stepper-btn";
+      minus.textContent = "–";
+      minus.setAttribute("aria-label","Decrease " + COUNTER_META[key].label + " count");
+
+      var countEl = document.createElement("span");
+      countEl.className = "serif text-lg w-6 text-center";
+      countEl.style.color = "var(--gold)";
+      countEl.textContent = state.counters[key] || 0;
+
+      var plus = document.createElement("button");
+      plus.className = "stepper-btn";
+      plus.textContent = "+";
+      plus.setAttribute("aria-label","Increase " + COUNTER_META[key].label + " count");
+
+      function syncCounterHistory(){
+        upsertHistoryEntry(todayStr(), {
+          counters: {
+            quants: state.counters.quants || 0,
+            reasoning: state.counters.reasoning || 0,
+            verbal: state.counters.verbal || 0
+          }
+        });
+        if(historyView.classList.contains("active")) renderHistory();
+      }
+
+      minus.addEventListener("click", function(){
+        if((state.counters[key]||0) <= 0) return;
+        state.counters[key] -= 1;
+        state.totals[key] = Math.max(0, (state.totals[key]||0) - 1);
+        countEl.textContent = state.counters[key];
+        sub.textContent = (state.totals[key]||0) + " total practiced";
+        syncCounterHistory();
+        save();
+      });
+      plus.addEventListener("click", function(){
+        state.counters[key] = (state.counters[key]||0) + 1;
+        state.totals[key] = (state.totals[key]||0) + 1;
+        countEl.textContent = state.counters[key];
+        sub.textContent = (state.totals[key]||0) + " total practiced";
+        syncCounterHistory();
+        save();
+      });
+
+      right.appendChild(minus);
+      right.appendChild(countEl);
+      right.appendChild(plus);
+      row.appendChild(left);
+      row.appendChild(right);
+      counterList.appendChild(row);
+    });
+  }
+
+  // ---------- SYLLABUS ----------
+  var subjectAccordion = document.getElementById("subjectAccordion");
+  var syllabusPct = document.getElementById("syllabusPct");
+  var syllabusSub = document.getElementById("syllabusSub");
+  var syllabusBarFill = document.getElementById("syllabusBarFill");
+
+  function topicUnitCounts(topic){
+    if(topic.subtopics){
+      var t = topic.subtopics.length;
+      var d = topic.subtopics.filter(function(s){ return s.done; }).length;
+      return { total:t, done:d };
+    }
+    return { total:1, done: topic.done ? 1 : 0 };
+  }
+
+  function subjectCounts(key){
+    var total = 0, done = 0;
+    state.syllabus[key].forEach(function(topic){
+      var c = topicUnitCounts(topic);
+      total += c.total; done += c.done;
+    });
+    return { total:total, done:done };
+  }
+
+  function renderSyllabusOverview(){
+    var totalTopics = 0, doneTopics = 0;
+    SUBJECTS.forEach(function(s){
+      var c = subjectCounts(s.key);
+      totalTopics += c.total; doneTopics += c.done;
+    });
+    var pct = totalTopics ? Math.round((doneTopics/totalTopics)*100) : 0;
+    syllabusPct.textContent = pct + "%";
+    syllabusSub.textContent = doneTopics + " of " + totalTopics + " topics marked done";
+    syllabusBarFill.style.width = pct + "%";
+  }
+
+  function renderAccordion(){
+    subjectAccordion.innerHTML = "";
+    SUBJECTS.forEach(function(subj){
+      var wrap = document.createElement("div");
+      wrap.style.borderBottom = "1px solid var(--line)";
+
+      var head = document.createElement("button");
+      head.className = "w-full flex items-center justify-between py-4 text-left";
+      head.setAttribute("aria-expanded", state.openSubject === subj.key ? "true" : "false");
+
+      var htitle = document.createElement("div");
+      var t1 = document.createElement("p");
+      t1.className = "text-[14.5px]";
+      t1.style.color = "var(--paper)";
+      t1.textContent = subj.label;
+      var t2 = document.createElement("p");
+      t2.className = "text-[12px] mt-0.5";
+      t2.style.color = "var(--muted)";
+      var c0 = subjectCounts(subj.key);
+      t2.textContent = c0.done + " / " + c0.total + " topics";
+      htitle.appendChild(t1);
+      htitle.appendChild(t2);
+
+      var chev = document.createElement("span");
+      chev.className = "chev text-[13px]" + (state.openSubject === subj.key ? " open" : "");
+      chev.style.color = "var(--muted)";
+      chev.textContent = "▾";
+
+      head.appendChild(htitle);
+      head.appendChild(chev);
+
+      var panel = document.createElement("div");
+      panel.className = "subject-panel" + (state.openSubject === subj.key ? " open" : "");
+
+      var ul = document.createElement("ul");
+      ul.className = "pb-3";
+
+      state.syllabus[subj.key].forEach(function(topic){
+        var li = document.createElement("li");
+        li.className = "py-1";
+
+        if(topic.subtopics){
+          var parentRow = document.createElement("div");
+          parentRow.className = "flex items-center gap-3 py-1.5";
+          var parentLbl = document.createElement("span");
+          parentLbl.className = "text-[14px]";
+          parentLbl.style.color = "var(--paper)";
+          parentLbl.textContent = topic.label;
+          var parentCount = document.createElement("span");
+          parentCount.className = "text-[11.5px]";
+          parentCount.style.color = "var(--muted)";
+          var pc = topicUnitCounts(topic);
+          parentCount.textContent = pc.done + "/" + pc.total;
+          parentRow.appendChild(parentLbl);
+          parentRow.appendChild(parentCount);
+          li.appendChild(parentRow);
+
+          var subUl = document.createElement("ul");
+          subUl.className = "ml-1 pl-3";
+          subUl.style.borderLeft = "1px solid var(--line)";
+          topic.subtopics.forEach(function(sub){
+            var subLi = document.createElement("li");
+            subLi.className = "flex items-center gap-3 py-1.5";
+
+            var scb = document.createElement("input");
+            scb.type = "checkbox";
+            scb.className = "chk sm";
+            scb.checked = sub.done;
+
+            var slbl = document.createElement("span");
+            slbl.className = "text-[13.5px]";
+            slbl.style.color = sub.done ? "var(--muted)" : "var(--paper)";
+            slbl.textContent = sub.label;
+
+            scb.addEventListener("change", function(){
+              sub.done = scb.checked;
+              slbl.style.color = sub.done ? "var(--muted)" : "var(--paper)";
+              var updated = topicUnitCounts(topic);
+              parentCount.textContent = updated.done + "/" + updated.total;
+              var sc = subjectCounts(subj.key);
+              t2.textContent = sc.done + " / " + sc.total + " topics";
+              save();
+              renderSyllabusOverview();
+            });
+
+            subLi.appendChild(scb);
+            subLi.appendChild(slbl);
+            subUl.appendChild(subLi);
+          });
+          li.appendChild(subUl);
+        } else {
+          var row = document.createElement("div");
+          row.className = "flex items-center gap-3 py-2";
+
+          var cb = document.createElement("input");
+          cb.type = "checkbox";
+          cb.className = "chk";
+          cb.checked = topic.done;
+
+          var lbl = document.createElement("span");
+          lbl.className = "text-[14px]";
+          lbl.style.color = topic.done ? "var(--muted)" : "var(--paper)";
+          lbl.textContent = topic.label;
+
+          cb.addEventListener("change", function(){
+            topic.done = cb.checked;
+            lbl.style.color = topic.done ? "var(--muted)" : "var(--paper)";
+            var sc = subjectCounts(subj.key);
+            t2.textContent = sc.done + " / " + sc.total + " topics";
+            save();
+            renderSyllabusOverview();
+          });
+
+          row.appendChild(cb);
+          row.appendChild(lbl);
+          li.appendChild(row);
+        }
+
+        ul.appendChild(li);
+      });
+
+      panel.appendChild(ul);
+
+      head.addEventListener("click", function(){
+        state.openSubject = state.openSubject === subj.key ? null : subj.key;
+        save();
+        renderAccordion();
+      });
+
+      wrap.appendChild(head);
+      wrap.appendChild(panel);
+      subjectAccordion.appendChild(wrap);
+    });
+  }
+
+  // ---------- HISTORY ----------
+  var historyList = document.getElementById("historyList");
+  var historyEmpty = document.getElementById("historyEmpty");
+  var totalQuantsEl = document.getElementById("totalQuantsEl");
+  var totalReasoningEl = document.getElementById("totalReasoningEl");
+  var totalVerbalEl = document.getElementById("totalVerbalEl");
+
+  function renderHistoryTotals(){
+    totalQuantsEl.textContent = state.totals.quants || 0;
+    totalReasoningEl.textContent = state.totals.reasoning || 0;
+    totalVerbalEl.textContent = state.totals.verbal || 0;
+  }
+
+  function renderHistory(){
+    renderHistoryTotals();
+
+    var dates = Object.keys(state.historyByDate).sort(function(a,b){ return a < b ? 1 : -1; });
+    historyList.innerHTML = "";
+
+    if(dates.length === 0){
+      historyEmpty.style.display = "block";
+      return;
+    }
+    historyEmpty.style.display = "none";
+
+    dates.forEach(function(dateStr){
+      var entry = state.historyByDate[dateStr];
+      var counters = entry.counters || { quants:0, reasoning:0, verbal:0 };
+      var row = document.createElement("div");
+      row.className = "history-row py-3.5";
+
+      var topRow = document.createElement("div");
+      topRow.className = "flex items-center justify-between";
+
+      var left = document.createElement("div");
+      left.className = "flex items-center gap-2.5";
+
+      var dot = document.createElement("span");
+      dot.className = "dot";
+      dot.style.background = barColor(entry.pct);
+      left.appendChild(dot);
+
+      var dateWrap = document.createElement("div");
+      var dLabel = document.createElement("p");
+      dLabel.className = "text-[14px]";
+      dLabel.style.color = "var(--paper)";
+      dLabel.textContent = prettyDate(dateStr) + (dateStr === todayStr() ? " · today" : "");
+      var tLabel = document.createElement("p");
+      tLabel.className = "text-[12px] mt-0.5";
+      tLabel.style.color = "var(--muted)";
+      tLabel.textContent = entry.completedAt ? ("Completed at " + entry.completedAt) : "Not fully completed";
+      dateWrap.appendChild(dLabel);
+      dateWrap.appendChild(tLabel);
+      left.appendChild(dateWrap);
+
+      var pctLabel = document.createElement("span");
+      pctLabel.className = "serif text-base";
+      pctLabel.style.color = barColor(entry.pct);
+      pctLabel.textContent = entry.pct + "%";
+
+      topRow.appendChild(left);
+      topRow.appendChild(pctLabel);
+      row.appendChild(topRow);
+
+      var qLine = document.createElement("p");
+      qLine.className = "text-[11.5px] mt-2 pl-[18px]";
+      qLine.style.color = "var(--muted)";
+      qLine.textContent = "Quants " + (counters.quants||0) + " · Reasoning " + (counters.reasoning||0) + " · Verbal " + (counters.verbal||0);
+      row.appendChild(qLine);
+
+      historyList.appendChild(row);
+    });
+  }
+
+  document.getElementById("saveCountersBtn").addEventListener("click", function(){
+    upsertHistoryEntry(todayStr(), {
+      counters: {
+        quants: state.counters.quants || 0,
+        reasoning: state.counters.reasoning || 0,
+        verbal: state.counters.verbal || 0
+      }
+    });
+    save();
+    showToast("Saved");
+    if(historyView.classList.contains("active")) renderHistory();
+  });
+
+  // ---------- MY TRACK (charts) ----------
+  var TRACK_COLORS = { quants:"#E4A93B", reasoning:"#4FA3E3", verbal:"#E85D8A" };
+  var trackBarChartEl = document.getElementById("trackBarChart");
+  var trackLineChartEl = document.getElementById("trackLineChart");
+  var trackEmptyEl = document.getElementById("trackEmpty");
+
+  function getLastNDays(n){
+    var out = [];
+    for(var i=n-1;i>=0;i--){
+      var d = new Date();
+      d.setDate(d.getDate()-i);
+      out.push(todayStr(d));
+    }
+    return out;
+  }
+
+  function shortDateLabel(dateStr){
+    var d = new Date(dateStr + "T00:00:00");
+    return d.toLocaleDateString(undefined, { day:"numeric", month:"short" });
+  }
+
+  function buildTrackData(n){
+    var days = getLastNDays(n);
+    return days.map(function(d){
+      var entry = state.historyByDate[d];
+      var counters = (entry && entry.counters) || { quants:0, reasoning:0, verbal:0 };
+      var pct = entry ? (entry.pct || 0) : 0;
+      return {
+        date: d,
+        quants: counters.quants || 0,
+        reasoning: counters.reasoning || 0,
+        verbal: counters.verbal || 0,
+        pct: pct
+      };
+    });
+  }
+
+  function renderTrackBarChart(data){
+    var W = 340, H = 178, padTop = 10, padBottom = 22;
+    var n = data.length;
+    var chartH = H - padTop - padBottom;
+    var groupW = W / n;
+    var barGap = 1.5;
+    var barW = Math.max(2.5, (groupW - barGap * 4) / 3);
+
+    var maxVal = 1;
+    data.forEach(function(d){
+      maxVal = Math.max(maxVal, d.quants, d.reasoning, d.verbal);
+    });
+    var niceMax = Math.max(5, Math.ceil(maxVal / 5) * 5);
+
+    var labelEvery = n <= 7 ? 1 : (n <= 10 ? 2 : 3);
+    var bars = "", labels = "";
+
+    data.forEach(function(d, i){
+      var gx = i * groupW;
+      var series = [
+        ["quants", d.quants, TRACK_COLORS.quants],
+        ["reasoning", d.reasoning, TRACK_COLORS.reasoning],
+        ["verbal", d.verbal, TRACK_COLORS.verbal]
+      ];
+      series.forEach(function(s, j){
+        var val = s[1];
+        var bh = (val / niceMax) * chartH;
+        if(val > 0) bh = Math.max(bh, 2);
+        var bx = gx + barGap + j * (barW + barGap);
+        var by = padTop + (chartH - bh);
+        bars += '<rect x="' + bx.toFixed(1) + '" y="' + by.toFixed(1) + '" width="' + barW.toFixed(1) + '" height="' + Math.max(bh, 0).toFixed(1) + '" rx="1.2" fill="' + s[2] + '"><title>' + s[0] + ': ' + val + '</title></rect>';
+      });
+      if(i % labelEvery === 0 || i === n - 1){
+        var lx = gx + groupW / 2;
+        labels += '<text x="' + lx.toFixed(1) + '" y="' + (H - 6) + '" font-size="8" text-anchor="middle" fill="#7A81A8">' + shortDateLabel(d.date) + '</text>';
+      }
+    });
+
+    var grid = '<line x1="0" y1="' + (padTop + chartH) + '" x2="' + W + '" y2="' + (padTop + chartH) + '" stroke="#333B66" stroke-width="1"></line>';
+
+    trackBarChartEl.innerHTML = '<svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%; height:auto; display:block;">' + grid + bars + labels + '</svg>';
+  }
+
+  function renderTrackLineChart(data){
+    var W = 340, H = 116, padTop = 10, padBottom = 20;
+    var n = data.length;
+    var chartH = H - padTop - padBottom;
+    var stepX = n > 1 ? W / (n - 1) : W;
+
+    var points = data.map(function(d, i){
+      var x = n > 1 ? i * stepX : W / 2;
+      var y = padTop + chartH - (d.pct / 100) * chartH;
+      return { x:x, y:y, pct:d.pct, date:d.date };
+    });
+
+    var pathD = points.map(function(p, i){ return (i === 0 ? "M" : "L") + p.x.toFixed(1) + "," + p.y.toFixed(1); }).join(" ");
+    var areaD = pathD +
+      " L" + points[points.length - 1].x.toFixed(1) + "," + (padTop + chartH) +
+      " L" + points[0].x.toFixed(1) + "," + (padTop + chartH) + " Z";
+
+    var dots = points.map(function(p){
+      var c = p.pct < 40 ? "#DD5B4E" : (p.pct < 75 ? "#E3A63C" : "#4CA57A");
+      return '<circle cx="' + p.x.toFixed(1) + '" cy="' + p.y.toFixed(1) + '" r="2.8" fill="' + c + '"><title>' + shortDateLabel(p.date) + ': ' + p.pct + '%</title></circle>';
+    }).join("");
+
+    var gridLines = "";
+    [0, 50, 100].forEach(function(v){
+      var gy = padTop + chartH - (v / 100) * chartH;
+      gridLines += '<line x1="0" y1="' + gy.toFixed(1) + '" x2="' + W + '" y2="' + gy.toFixed(1) + '" stroke="#333B66" stroke-width="1" stroke-dasharray="2,3"></line>';
+    });
+
+    var labelEvery = n <= 7 ? 1 : (n <= 10 ? 2 : 3);
+    var labels = "";
+    points.forEach(function(p, i){
+      if(i % labelEvery === 0 || i === points.length - 1){
+        labels += '<text x="' + p.x.toFixed(1) + '" y="' + (H - 6) + '" font-size="8" text-anchor="middle" fill="#7A81A8">' + shortDateLabel(p.date) + '</text>';
+      }
+    });
+
+    trackLineChartEl.innerHTML = '<svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%; height:auto; display:block;">' +
+      gridLines +
+      '<path d="' + areaD + '" fill="#4CA57A" opacity="0.14"></path>' +
+      '<path d="' + pathD + '" fill="none" stroke="#4CA57A" stroke-width="2"></path>' +
+      dots + labels + '</svg>';
+  }
+
+  function renderTrack(){
+    var data = buildTrackData(14);
+    var hasAny = data.some(function(d){ return d.quants || d.reasoning || d.verbal || d.pct; });
+    trackEmptyEl.style.display = hasAny ? "none" : "block";
+    trackBarChartEl.style.display = hasAny ? "block" : "none";
+    trackLineChartEl.style.display = hasAny ? "block" : "none";
+    if(hasAny){
+      renderTrackBarChart(data);
+      renderTrackLineChart(data);
+    }
+  }
+
+  // ---------- init ----------
+  renderTasks();
+  renderDailyProgress();
+  renderCounters();
+  renderSyllabusOverview();
+  renderAccordion();
+  streakCountEl.textContent = state.streak;
+
+})();
+</script>
+</body>
+</html>
