@@ -117,6 +117,16 @@
   }
   .tab-btn.active{color:var(--gold);border-color:var(--gold);}
 
+  .range-btn{
+    padding:6px 14px;
+    font-size:12.5px;
+    color:var(--muted);
+    border:1px solid var(--line);
+    background:transparent;
+    transition:color .15s ease, border-color .15s ease, background .15s ease;
+  }
+  .range-btn.active{color:var(--ink);background:var(--gold);border-color:var(--gold);}
+
   .view{display:none;}
   .view.active{display:block;}
 
@@ -250,22 +260,33 @@
   <div id="trackView" class="view">
     <section class="pt-6">
       <h2 class="serif text-lg mb-1" style="color:var(--paper);">My Track</h2>
-      <p class="text-[12.5px] mb-6" style="color:var(--muted);">Day-wise view of your progress and practice.</p>
+      <p class="text-[12.5px] mb-4" style="color:var(--muted);">Day-wise view of your progress and practice.</p>
+
+      <div class="flex gap-2 mb-6">
+        <button class="range-btn active" data-range="14">14D</button>
+        <button class="range-btn" data-range="30">30D</button>
+        <button class="range-btn" data-range="all">All</button>
+      </div>
 
       <h3 class="text-[13px] mb-2" style="color:var(--paper-dim);">Daily progress</h3>
-      <div class="relative" style="height:200px;">
-        <canvas id="progressChart"></canvas>
+      <div class="overflow-x-auto pb-1" id="progressChartScroll">
+        <div class="relative" id="progressChartWrap" style="height:200px;">
+          <canvas id="progressChart"></canvas>
+        </div>
       </div>
 
       <h3 class="text-[13px] mt-9 mb-2" style="color:var(--paper-dim);">Questions attempted by subject</h3>
-      <div class="relative" style="height:240px;">
-        <canvas id="subjectsChart"></canvas>
+      <div class="overflow-x-auto pb-1" id="subjectsChartScroll">
+        <div class="relative" id="subjectsChartWrap" style="height:240px;">
+          <canvas id="subjectsChart"></canvas>
+        </div>
       </div>
       <div class="flex flex-wrap gap-x-4 gap-y-2 mt-4 text-[11.5px]" style="color:var(--muted);">
         <span class="flex items-center gap-1.5"><span class="inline-block w-2.5 h-2.5 rounded-sm" style="background:#4FC3F7;"></span>Quants</span>
         <span class="flex items-center gap-1.5"><span class="inline-block w-2.5 h-2.5 rounded-sm" style="background:#FF6F91;"></span>Reasoning</span>
         <span class="flex items-center gap-1.5"><span class="inline-block w-2.5 h-2.5 rounded-sm" style="background:#6EE7B7;"></span>Verbal</span>
       </div>
+      <p class="text-[11px] mt-2" style="color:var(--muted);">Swipe the charts sideways to scroll through more days.</p>
 
       <p id="trackEmpty" class="text-[13px] pt-10 text-center" style="color:var(--muted); display:none;">Log a few days of practice to see your trend here.</p>
     </section>
@@ -512,6 +533,13 @@
     if(pct < 40) return "var(--red)";
     if(pct < 75) return "var(--amber)";
     return "var(--green)";
+  }
+
+  // Canvas (Chart.js) can't resolve CSS variables like var(--red), so charts use literal hex values here.
+  function chartBarColor(pct){
+    if(pct < 40) return "#DD5B4E";
+    if(pct < 75) return "#E3A63C";
+    return "#4CA57A";
   }
 
   function renderTasks(){
@@ -955,11 +983,25 @@
   var progressChartInstance = null;
   var subjectsChartInstance = null;
   var trackEmpty = document.getElementById("trackEmpty");
-  var TRACK_DAYS = 14;
+  var progressChartWrap = document.getElementById("progressChartWrap");
+  var subjectsChartWrap = document.getElementById("subjectsChartWrap");
+  var trackRange = 14; // 14, 30, or "all"
+
+  document.querySelectorAll(".range-btn").forEach(function(btn){
+    btn.addEventListener("click", function(){
+      document.querySelectorAll(".range-btn").forEach(function(b){ b.classList.remove("active"); });
+      btn.classList.add("active");
+      var r = btn.getAttribute("data-range");
+      trackRange = (r === "all") ? "all" : parseInt(r, 10);
+      renderTrackCharts();
+    });
+  });
 
   function buildTrackChartData(){
     var dates = Object.keys(state.historyByDate).sort(); // ascending
-    dates = dates.slice(-TRACK_DAYS);
+    if(trackRange !== "all"){
+      dates = dates.slice(-trackRange);
+    }
     var labels = dates.map(function(d){ return prettyDate(d).replace(/^\w+,\s*/, ""); }); // drop weekday, keep "Sep 21"
     var quants = [], reasoning = [], verbal = [], pct = [];
     dates.forEach(function(d){
@@ -975,6 +1017,10 @@
 
   function renderTrackCharts(){
     var data = buildTrackChartData();
+
+    // widen the scrollable area as day count grows, instead of squishing bars
+    progressChartWrap.style.width = "max(100%, " + (data.count * 34) + "px)";
+    subjectsChartWrap.style.width = "max(100%, " + (data.count * 66) + "px)";
 
     if(data.count === 0){
       trackEmpty.style.display = "block";
@@ -997,7 +1043,7 @@
     };
 
     // ---- Chart 1: Daily progress (single bar, colored red/amber/green per day) ----
-    var progressColors = data.pct.map(function(p){ return barColor(p); });
+    var progressColors = data.pct.map(function(p){ return chartBarColor(p); });
 
     var progressData = {
       labels: data.labels,
