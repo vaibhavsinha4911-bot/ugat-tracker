@@ -127,6 +127,48 @@
   }
   .range-btn.active{color:var(--ink);background:var(--gold);border-color:var(--gold);}
 
+  #splashScreen{
+    position:fixed;
+    inset:0;
+    z-index:9999;
+    background:var(--ink);
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    padding:24px;
+    text-align:center;
+  }
+  #splashLogo{
+    font-size:76px;
+    line-height:1;
+    transform:scale(0.15);
+    opacity:0;
+    animation:splashBoom .7s cubic-bezier(.34,1.56,.64,1) forwards;
+  }
+  #splashTagline{
+    color:var(--paper-dim);
+    font-size:16px;
+    margin-top:16px;
+    opacity:0;
+    transform:translateY(10px);
+    animation:splashFadeUp .5s ease forwards;
+    animation-delay:.5s;
+  }
+  @keyframes splashBoom{
+    0%{ transform:scale(0.15); opacity:0; }
+    55%{ transform:scale(1.22); opacity:1; }
+    75%{ transform:scale(0.92); }
+    100%{ transform:scale(1); opacity:1; }
+  }
+  @keyframes splashFadeUp{
+    from{ opacity:0; transform:translateY(10px); }
+    to{ opacity:1; transform:translateY(0); }
+  }
+  @media (prefers-reduced-motion: reduce){
+    #splashLogo, #splashTagline{ animation:none; opacity:1; transform:none; }
+  }
+
   .view{display:none;}
   .view.active{display:block;}
 
@@ -148,6 +190,12 @@
 </style>
 </head>
 <body class="min-h-full">
+
+<div id="splashScreen">
+  <div id="splashLogo">🔥</div>
+  <p id="splashTagline" class="serif">Track your focus, see your progress.</p>
+</div>
+
 
 <header class="sticky top-0 z-20" style="padding-top:env(safe-area-inset-top,0px); background:var(--ink); border-bottom:1px solid var(--line);">
   <div class="max-w-md mx-auto px-5 pt-4">
@@ -299,6 +347,21 @@
 <script>
 (function(){
   "use strict";
+
+  // ---------- SPLASH ----------
+  (function(){
+    var splash = document.getElementById("splashScreen");
+    if(!splash) return;
+    var reduced = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    var holdTime = reduced ? 300 : 1600;
+    setTimeout(function(){
+      splash.style.transition = "opacity .4s ease";
+      splash.style.opacity = "0";
+      setTimeout(function(){
+        if(splash && splash.parentNode) splash.parentNode.removeChild(splash);
+      }, 420);
+    }, holdTime);
+  })();
 
   var STORAGE_KEY = "ugatPrepDashboard_v2";
   var OLD_STORAGE_KEY = "ugatPrepDashboard_v1";
