@@ -1,6 +1,6 @@
 {
-  "name": "UGAT Personal Tracker",
-  "short_name": "UGAT Tracker",
+  "name": "Vaibhav's UGAT Tracker",
+  "short_name": "Vaibhav's Tracker",
   "start_url": "./index.html",
   "scope": ".",
   "display": "standalone",
