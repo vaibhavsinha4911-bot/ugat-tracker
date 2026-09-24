@@ -195,6 +195,23 @@
   .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
 
   .history-row{border-bottom:1px solid var(--line);}
+
+  .star-rating{
+    position:relative;
+    display:inline-block;
+    font-size:14px;
+    letter-spacing:2px;
+    line-height:1;
+    white-space:nowrap;
+  }
+  .stars-empty{color:var(--line);}
+  .stars-fill{
+    position:absolute;
+    top:0; left:0;
+    overflow:hidden;
+    color:var(--gold);
+    white-space:nowrap;
+  }
   .dot{width:8px;height:8px;border-radius:50%;display:inline-block;}
 </style>
 </head>
@@ -1223,6 +1240,40 @@
         " · Reasoning " + fmtVsGoal(counters.reasoning||0, state.targets.reasoning||0) +
         " · Verbal " + fmtVsGoal(counters.verbal||0, state.targets.verbal||0);
       row.appendChild(qLine);
+
+      var totalGoal = (state.targets.quants||0) + (state.targets.reasoning||0) + (state.targets.verbal||0);
+      if(totalGoal > 0){
+        var totalAttempted = (counters.quants||0) + (counters.reasoning||0) + (counters.verbal||0);
+        var ratio = totalAttempted / totalGoal;
+        var starValue = Math.round(ratio * 5 * 2) / 2; // nearest 0.5
+        var starCount = Math.max(5, Math.ceil(starValue));
+        var fillPct = starCount > 0 ? Math.min(100, (starValue / starCount) * 100) : 0;
+        var starsStr = new Array(starCount + 1).join("★");
+
+        var starWrap = document.createElement("div");
+        starWrap.className = "flex items-center gap-2 mt-2 pl-[18px]";
+
+        var starBox = document.createElement("div");
+        starBox.className = "star-rating";
+        var starsEmpty = document.createElement("div");
+        starsEmpty.className = "stars-empty";
+        starsEmpty.textContent = starsStr;
+        var starsFill = document.createElement("div");
+        starsFill.className = "stars-fill";
+        starsFill.style.width = fillPct + "%";
+        starsFill.textContent = starsStr;
+        starBox.appendChild(starsEmpty);
+        starBox.appendChild(starsFill);
+
+        var starValueLabel = document.createElement("span");
+        starValueLabel.className = "text-[11px]";
+        starValueLabel.style.color = "var(--gold)";
+        starValueLabel.textContent = starValue + (starValue === 1 ? " star" : " stars");
+
+        starWrap.appendChild(starBox);
+        starWrap.appendChild(starValueLabel);
+        row.appendChild(starWrap);
+      }
 
       historyList.appendChild(row);
     });
