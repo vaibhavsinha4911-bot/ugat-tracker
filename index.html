@@ -3,14 +3,14 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>UGAT Personal Tracker</title>
+<title>Vaibhav's UGAT Tracker</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#10142A">
 <link rel="apple-touch-icon" href="icon-192.png">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="UGAT Tracker">
+<meta name="apple-mobile-web-app-title" content="Vaibhav's Tracker">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -146,14 +146,23 @@
     opacity:0;
     animation:splashBoom .7s cubic-bezier(.34,1.56,.64,1) forwards;
   }
-  #splashTagline{
-    color:var(--paper-dim);
-    font-size:16px;
-    margin-top:16px;
+  #splashName{
+    color:var(--gold);
+    font-size:19px;
+    margin-top:18px;
     opacity:0;
     transform:translateY(10px);
     animation:splashFadeUp .5s ease forwards;
-    animation-delay:.5s;
+    animation-delay:.45s;
+  }
+  #splashTagline{
+    color:var(--paper-dim);
+    font-size:14px;
+    margin-top:6px;
+    opacity:0;
+    transform:translateY(10px);
+    animation:splashFadeUp .5s ease forwards;
+    animation-delay:.65s;
   }
   @keyframes splashBoom{
     0%{ transform:scale(0.15); opacity:0; }
@@ -166,7 +175,7 @@
     to{ opacity:1; transform:translateY(0); }
   }
   @media (prefers-reduced-motion: reduce){
-    #splashLogo, #splashTagline{ animation:none; opacity:1; transform:none; }
+    #splashLogo, #splashName, #splashTagline{ animation:none; opacity:1; transform:none; }
   }
 
   .view{display:none;}
@@ -193,6 +202,7 @@
 
 <div id="splashScreen">
   <div id="splashLogo">🔥</div>
+  <p id="splashName" class="serif">Vaibhav's UGAT Tracker</p>
   <p id="splashTagline" class="serif">Track your focus, see your progress.</p>
 </div>
 
@@ -201,7 +211,7 @@
   <div class="max-w-md mx-auto px-5 pt-4">
     <div class="flex items-center justify-between">
       <div>
-        <p class="serif text-[20px] leading-none" style="color:var(--paper);">UGAT Personal Tracker</p>
+        <p class="serif text-[20px] leading-none" style="color:var(--paper);">Vaibhav's UGAT Tracker</p>
         <p class="text-[12px] mt-1" style="color:var(--muted);" id="todayDateLabel">&nbsp;</p>
       </div>
       <div class="flex items-center gap-1.5 pl-3 pr-3.5 py-1.5" style="border:1px solid var(--line);">
@@ -273,6 +283,7 @@
     </section>
 
     <p class="text-[11.5px] text-center pt-12" style="color:var(--muted);">Everything on this page is stored only on this phone.</p>
+    <p class="text-[11px] text-center pt-2" style="color:var(--gold-dim);">Built by Vaibhav 🔥</p>
   </div>
 
   <!-- ===================== HISTORY VIEW ===================== -->
@@ -301,6 +312,16 @@
 
       <div id="historyList"></div>
       <p id="historyEmpty" class="text-[13px] pt-6" style="color:var(--muted); display:none;">Nothing logged yet — finish today's routine to start your record.</p>
+
+      <div class="mt-10 pt-6" style="border-top:1px solid var(--line);">
+        <p class="text-[12px] mb-1" style="color:var(--paper-dim);">Backup your data</p>
+        <p class="text-[11.5px] mb-3" style="color:var(--muted);">Your progress lives only on this device. Export a backup occasionally so you don't lose it.</p>
+        <div class="flex gap-2">
+          <button id="exportBackupBtn" class="text-[13px] px-4 py-2 flex-1" style="border:1px solid var(--gold-dim); color:var(--gold);">Export backup</button>
+          <button id="importBackupBtn" class="text-[13px] px-4 py-2 flex-1" style="border:1px solid var(--line); color:var(--paper-dim);">Import backup</button>
+        </div>
+        <input type="file" id="importFileInput" accept="application/json" style="display:none;">
+      </div>
     </section>
   </div>
 
@@ -423,6 +444,21 @@
     return d.toLocaleDateString(undefined, { weekday:"short", month:"short", day:"numeric" });
   }
 
+  function getGreeting(){
+    var h = new Date().getHours();
+    if(h < 5) return "Still up, Vaibhav?";
+    if(h < 12) return "Good morning, Vaibhav";
+    if(h < 17) return "Good afternoon, Vaibhav";
+    if(h < 21) return "Good evening, Vaibhav";
+    return "Good night, Vaibhav";
+  }
+
+  function daysBetween(dateStr1, dateStr2){
+    var a = new Date(dateStr1 + "T00:00:00");
+    var b = new Date(dateStr2 + "T00:00:00");
+    return Math.round((b - a) / 86400000);
+  }
+
   function buildSyllabusFromDefaults(existing){
     var out = {};
     SUBJECTS.forEach(function(s){
@@ -434,7 +470,8 @@
         if(typeof topicDef === "string"){
           var prev = existingByLabel[topicDef];
           var done = (prev && typeof prev.done === "boolean") ? prev.done : false;
-          return { id: uid(), label: topicDef, done: done };
+          var flagged = (prev && typeof prev.flagged === "boolean") ? prev.flagged : false;
+          return { id: uid(), label: topicDef, done: done, flagged: flagged };
         } else {
           var prevParent = existingByLabel[topicDef.label];
           var prevSubsByLabel = {};
@@ -444,7 +481,8 @@
           var subtopics = topicDef.subtopics.map(function(subLabel){
             var prevSub = prevSubsByLabel[subLabel];
             var subDone = (prevSub && typeof prevSub.done === "boolean") ? prevSub.done : false;
-            return { id: uid(), label: subLabel, done: subDone };
+            var subFlagged = (prevSub && typeof prevSub.flagged === "boolean") ? prevSub.flagged : false;
+            return { id: uid(), label: subLabel, done: subDone, flagged: subFlagged };
           });
           return { id: uid(), label: topicDef.label, subtopics: subtopics };
         }
@@ -463,10 +501,12 @@
       countersDate: todayStr(),
       counters: { quants:0, reasoning:0, verbal:0 },
       totals: { quants:0, reasoning:0, verbal:0 },
+      targets: { quants:20, reasoning:20, verbal:20 },
       syllabus: buildSyllabusFromDefaults(null),
       openSubject: null,
       completionTimes: {},
-      historyByDate: {}
+      historyByDate: {},
+      firstUsedDate: todayStr()
     };
   }
 
@@ -488,11 +528,13 @@
       parsed.tasks = (parsed.tasks && parsed.tasks.length) ? parsed.tasks : fresh.tasks;
       parsed.counters = parsed.counters || fresh.counters;
       parsed.totals = parsed.totals || fresh.totals;
+      parsed.targets = parsed.targets || fresh.targets;
       parsed.completionTimes = parsed.completionTimes || {};
       parsed.historyByDate = parsed.historyByDate || {};
       parsed.syllabus = buildSyllabusFromDefaults(parsed.syllabus);
       if(typeof parsed.streak !== "number") parsed.streak = 0;
       if(typeof parsed.completedToday !== "boolean") parsed.completedToday = false;
+      if(typeof parsed.firstUsedDate !== "string") parsed.firstUsedDate = parsed.dailyTaskDate || todayStr();
       return parsed;
     }catch(e){
       console.error("Load failed, starting fresh.", e);
@@ -561,7 +603,8 @@
     toastTimer = setTimeout(function(){ el.classList.remove("show"); }, 1800);
   }
 
-  document.getElementById("todayDateLabel").textContent = new Date().toLocaleDateString(undefined, { weekday:"long", month:"long", day:"numeric" });
+  var dayNumber = daysBetween(state.firstUsedDate, todayStr()) + 1;
+  document.getElementById("todayDateLabel").textContent = getGreeting() + " · Day " + dayNumber + " of your journey";
 
   // ---------- TABS ----------
   var tabDashboardBtn = document.getElementById("tabDashboardBtn");
@@ -712,7 +755,10 @@
     counterList.innerHTML = "";
     Object.keys(COUNTER_META).forEach(function(key){
       var row = document.createElement("div");
-      row.className = "flex items-center justify-between py-4";
+      row.className = "py-4";
+
+      var topRow = document.createElement("div");
+      topRow.className = "flex items-center justify-between";
 
       var left = document.createElement("div");
       var title = document.createElement("p");
@@ -744,6 +790,86 @@
       plus.textContent = "+";
       plus.setAttribute("aria-label","Increase " + COUNTER_META[key].label + " count");
 
+      // ---- daily goal row ----
+      var goalRow = document.createElement("div");
+      goalRow.className = "mt-3";
+
+      var goalLine = document.createElement("div");
+      goalLine.className = "flex items-center justify-between";
+
+      var goalText = document.createElement("p");
+      goalText.className = "text-[11.5px]";
+
+      var editGoalBtn = document.createElement("button");
+      editGoalBtn.className = "text-[11px] px-2 py-0.5";
+      editGoalBtn.style.color = "var(--muted)";
+      editGoalBtn.style.border = "1px solid var(--line)";
+      editGoalBtn.textContent = "Edit goal";
+
+      goalLine.appendChild(goalText);
+      goalLine.appendChild(editGoalBtn);
+
+      var goalBarTrack = document.createElement("div");
+      goalBarTrack.className = "bar-track h-1.5 w-full overflow-hidden mt-1.5";
+      var goalBarFill = document.createElement("div");
+      goalBarFill.className = "bar-fill h-full";
+      goalBarTrack.appendChild(goalBarFill);
+
+      var goalEditRow = document.createElement("div");
+      goalEditRow.className = "flex items-center gap-2 mt-1.5";
+      goalEditRow.style.display = "none";
+      var goalInput = document.createElement("input");
+      goalInput.type = "number";
+      goalInput.min = "0";
+      goalInput.className = "text-[13px] px-2 py-1 w-20 bg-transparent outline-none";
+      goalInput.style.border = "1px solid var(--line)";
+      goalInput.style.color = "var(--paper)";
+      var goalSaveBtn = document.createElement("button");
+      goalSaveBtn.className = "text-[11.5px] px-2 py-1";
+      goalSaveBtn.style.color = "var(--gold)";
+      goalSaveBtn.style.border = "1px solid var(--gold-dim)";
+      goalSaveBtn.textContent = "Save";
+      goalEditRow.appendChild(goalInput);
+      goalEditRow.appendChild(goalSaveBtn);
+
+      function refreshGoalUI(){
+        var target = state.targets[key] || 0;
+        var today = state.counters[key] || 0;
+        if(target > 0){
+          var pct = Math.min(100, Math.round((today/target)*100));
+          goalText.textContent = "Goal " + today + "/" + target + " today";
+          goalText.style.color = pct >= 100 ? "var(--green)" : "var(--muted)";
+          goalBarFill.style.width = pct + "%";
+          goalBarFill.style.background = pct >= 100 ? "var(--green)" : "var(--gold)";
+          goalBarTrack.style.display = "block";
+        } else {
+          goalText.textContent = "No daily goal set";
+          goalText.style.color = "var(--muted)";
+          goalBarTrack.style.display = "none";
+        }
+      }
+
+      editGoalBtn.addEventListener("click", function(){
+        goalInput.value = state.targets[key] || 0;
+        goalLine.style.display = "none";
+        goalBarTrack.style.display = "none";
+        goalEditRow.style.display = "flex";
+        goalInput.focus();
+      });
+
+      goalSaveBtn.addEventListener("click", function(){
+        var val = parseInt(goalInput.value, 10);
+        state.targets[key] = isNaN(val) || val < 0 ? 0 : val;
+        save();
+        goalEditRow.style.display = "none";
+        goalLine.style.display = "flex";
+        refreshGoalUI();
+      });
+
+      goalRow.appendChild(goalLine);
+      goalRow.appendChild(goalBarTrack);
+      goalRow.appendChild(goalEditRow);
+
       function syncCounterHistory(){
         upsertHistoryEntry(todayStr(), {
           counters: {
@@ -753,7 +879,7 @@
           }
         });
         if(historyView.classList.contains("active")) renderHistory();
-    if(trackView.classList.contains("active")) renderTrackCharts();
+        if(trackView.classList.contains("active")) renderTrackCharts();
       }
 
       minus.addEventListener("click", function(){
@@ -762,6 +888,7 @@
         state.totals[key] = Math.max(0, (state.totals[key]||0) - 1);
         countEl.textContent = state.counters[key];
         sub.textContent = (state.totals[key]||0) + " total practiced";
+        refreshGoalUI();
         syncCounterHistory();
         save();
       });
@@ -770,6 +897,7 @@
         state.totals[key] = (state.totals[key]||0) + 1;
         countEl.textContent = state.counters[key];
         sub.textContent = (state.totals[key]||0) + " total practiced";
+        refreshGoalUI();
         syncCounterHistory();
         save();
       });
@@ -777,9 +905,13 @@
       right.appendChild(minus);
       right.appendChild(countEl);
       right.appendChild(plus);
-      row.appendChild(left);
-      row.appendChild(right);
+      topRow.appendChild(left);
+      topRow.appendChild(right);
+      row.appendChild(topRow);
+      row.appendChild(goalRow);
       counterList.appendChild(row);
+
+      refreshGoalUI();
     });
   }
 
@@ -889,9 +1021,15 @@
             scb.checked = sub.done;
 
             var slbl = document.createElement("span");
-            slbl.className = "text-[13.5px]";
+            slbl.className = "text-[13.5px] flex-1";
             slbl.style.color = sub.done ? "var(--muted)" : "var(--paper)";
             slbl.textContent = sub.label;
+
+            var sFlagBtn = document.createElement("button");
+            sFlagBtn.setAttribute("aria-label", "Mark " + sub.label + " for revision");
+            sFlagBtn.className = "text-[13px] px-1";
+            sFlagBtn.textContent = "⚑";
+            sFlagBtn.style.color = sub.flagged ? "var(--red)" : "var(--line)";
 
             scb.addEventListener("change", function(){
               sub.done = scb.checked;
@@ -904,8 +1042,15 @@
               renderSyllabusOverview();
             });
 
+            sFlagBtn.addEventListener("click", function(){
+              sub.flagged = !sub.flagged;
+              sFlagBtn.style.color = sub.flagged ? "var(--red)" : "var(--line)";
+              save();
+            });
+
             subLi.appendChild(scb);
             subLi.appendChild(slbl);
+            subLi.appendChild(sFlagBtn);
             subUl.appendChild(subLi);
           });
           li.appendChild(subUl);
@@ -919,9 +1064,15 @@
           cb.checked = topic.done;
 
           var lbl = document.createElement("span");
-          lbl.className = "text-[14px]";
+          lbl.className = "text-[14px] flex-1";
           lbl.style.color = topic.done ? "var(--muted)" : "var(--paper)";
           lbl.textContent = topic.label;
+
+          var flagBtn = document.createElement("button");
+          flagBtn.setAttribute("aria-label", "Mark " + topic.label + " for revision");
+          flagBtn.className = "text-[13px] px-1";
+          flagBtn.textContent = "⚑";
+          flagBtn.style.color = topic.flagged ? "var(--red)" : "var(--line)";
 
           cb.addEventListener("change", function(){
             topic.done = cb.checked;
@@ -932,8 +1083,15 @@
             renderSyllabusOverview();
           });
 
+          flagBtn.addEventListener("click", function(){
+            topic.flagged = !topic.flagged;
+            flagBtn.style.color = topic.flagged ? "var(--red)" : "var(--line)";
+            save();
+          });
+
           row.appendChild(cb);
           row.appendChild(lbl);
+          row.appendChild(flagBtn);
           li.appendChild(row);
         }
 
@@ -1040,6 +1198,98 @@
     showToast("Saved");
     if(historyView.classList.contains("active")) renderHistory();
     if(trackView.classList.contains("active")) renderTrackCharts();
+  });
+
+  // ---------- BACKUP: EXPORT / IMPORT ----------
+  function exportBackup(){
+    var filename = "ugat-tracker-backup-" + todayStr() + ".json";
+    var jsonStr = JSON.stringify(state, null, 2);
+
+    function fallbackDownload(){
+      try{
+        var blob = new Blob([jsonStr], { type: "application/json" });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement("a");
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
+        showToast("Backup downloaded");
+      }catch(e){
+        console.error("Backup download failed.", e);
+        showToast("Couldn't create backup file");
+      }
+    }
+
+    if(window.claude && typeof window.claude.use === "function"){
+      window.claude.use("downloads").then(function(downloads){
+        if(!downloads){ fallbackDownload(); return; }
+        downloads.save({ filename: filename, data: jsonStr }).then(function(){
+          showToast("Backup saved");
+        }).catch(function(){
+          fallbackDownload();
+        });
+      }).catch(fallbackDownload);
+    } else {
+      fallbackDownload();
+    }
+  }
+
+  function importBackup(file){
+    var reader = new FileReader();
+    reader.onload = function(){
+      try{
+        var parsed = JSON.parse(reader.result);
+        if(!parsed || typeof parsed !== "object"){ throw new Error("Not a valid backup file"); }
+
+        var fresh = defaultState();
+        parsed.tasks = (parsed.tasks && parsed.tasks.length) ? parsed.tasks : fresh.tasks;
+        parsed.counters = parsed.counters || fresh.counters;
+        parsed.totals = parsed.totals || fresh.totals;
+        parsed.targets = parsed.targets || fresh.targets;
+        parsed.completionTimes = parsed.completionTimes || {};
+        parsed.historyByDate = parsed.historyByDate || {};
+        parsed.syllabus = buildSyllabusFromDefaults(parsed.syllabus);
+        if(typeof parsed.streak !== "number") parsed.streak = 0;
+        if(typeof parsed.completedToday !== "boolean") parsed.completedToday = false;
+        if(typeof parsed.dailyTaskDate !== "string") parsed.dailyTaskDate = todayStr();
+        if(typeof parsed.countersDate !== "string") parsed.countersDate = todayStr();
+
+        state = parsed;
+        rollOverDayIfNeeded();
+        renderTasks();
+        renderDailyProgress();
+        renderCounters();
+        renderSyllabusOverview();
+        renderAccordion();
+        streakCountEl.textContent = state.streak;
+        if(historyView.classList.contains("active")) renderHistory();
+        if(trackView.classList.contains("active")) renderTrackCharts();
+        showToast("Backup restored");
+      }catch(e){
+        console.error("Import failed.", e);
+        showToast("Couldn't read that backup file");
+      }
+    };
+    reader.onerror = function(){
+      showToast("Couldn't read that file");
+    };
+    reader.readAsText(file);
+  }
+
+  document.getElementById("exportBackupBtn").addEventListener("click", exportBackup);
+
+  var importFileInput = document.getElementById("importFileInput");
+  document.getElementById("importBackupBtn").addEventListener("click", function(){
+    importFileInput.click();
+  });
+  importFileInput.addEventListener("change", function(){
+    if(importFileInput.files && importFileInput.files[0]){
+      importBackup(importFileInput.files[0]);
+    }
+    importFileInput.value = "";
   });
 
   // ---------- MY TRACK (charts) ----------
