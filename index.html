@@ -648,12 +648,48 @@
     return "#4CA57A";
   }
 
+  function moveTask(taskId, direction){
+    var idx = state.tasks.findIndex(function(t){ return t.id === taskId; });
+    if(idx === -1) return;
+    var newIdx = idx + (direction === "up" ? -1 : 1);
+    if(newIdx < 0 || newIdx >= state.tasks.length) return;
+    var temp = state.tasks[idx];
+    state.tasks[idx] = state.tasks[newIdx];
+    state.tasks[newIdx] = temp;
+    save();
+    renderTasks();
+  }
+
   function renderTasks(){
     taskList.innerHTML = "";
-    state.tasks.forEach(function(task){
+    state.tasks.forEach(function(task, index){
       var li = document.createElement("li");
-      li.className = "flex items-center gap-3 py-2.5" + (task.done ? " task-done" : "");
+      li.className = "flex items-center gap-2 py-2.5" + (task.done ? " task-done" : "");
       li.style.borderBottom = "1px solid var(--line)";
+
+      var reorderCol = document.createElement("div");
+      reorderCol.className = "flex flex-col shrink-0";
+
+      var upBtn = document.createElement("button");
+      upBtn.setAttribute("aria-label","Move " + task.label + " up");
+      upBtn.className = "leading-none px-1";
+      upBtn.style.fontSize = "10px";
+      upBtn.style.color = index === 0 ? "var(--line)" : "var(--muted)";
+      upBtn.textContent = "▲";
+      upBtn.disabled = index === 0;
+      upBtn.addEventListener("click", function(){ moveTask(task.id, "up"); });
+
+      var downBtn = document.createElement("button");
+      downBtn.setAttribute("aria-label","Move " + task.label + " down");
+      downBtn.className = "leading-none px-1";
+      downBtn.style.fontSize = "10px";
+      downBtn.style.color = (index === state.tasks.length - 1) ? "var(--line)" : "var(--muted)";
+      downBtn.textContent = "▼";
+      downBtn.disabled = index === state.tasks.length - 1;
+      downBtn.addEventListener("click", function(){ moveTask(task.id, "down"); });
+
+      reorderCol.appendChild(upBtn);
+      reorderCol.appendChild(downBtn);
 
       var cb = document.createElement("input");
       cb.type = "checkbox";
@@ -683,6 +719,7 @@
         renderDailyProgress();
       });
 
+      li.appendChild(reorderCol);
       li.appendChild(cb);
       li.appendChild(label);
       li.appendChild(del);
@@ -1179,7 +1216,12 @@
       var qLine = document.createElement("p");
       qLine.className = "text-[11.5px] mt-2 pl-[18px]";
       qLine.style.color = "var(--muted)";
-      qLine.textContent = "Quants " + (counters.quants||0) + " · Reasoning " + (counters.reasoning||0) + " · Verbal " + (counters.verbal||0);
+      function fmtVsGoal(count, target){
+        return target > 0 ? (count + "/" + target) : String(count);
+      }
+      qLine.textContent = "Quants " + fmtVsGoal(counters.quants||0, state.targets.quants||0) +
+        " · Reasoning " + fmtVsGoal(counters.reasoning||0, state.targets.reasoning||0) +
+        " · Verbal " + fmtVsGoal(counters.verbal||0, state.targets.verbal||0);
       row.appendChild(qLine);
 
       historyList.appendChild(row);
