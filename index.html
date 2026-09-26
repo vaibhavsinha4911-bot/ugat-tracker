@@ -633,8 +633,7 @@
     toastTimer = setTimeout(function(){ el.classList.remove("show"); }, 1800);
   }
 
-  var dayNumber = daysBetween(state.firstUsedDate, todayStr()) + 1;
-  document.getElementById("todayDateLabel").textContent = getGreeting() + " · Day " + dayNumber + " of your journey";
+  document.getElementById("todayDateLabel").textContent = getGreeting();
 
   // ---------- TABS ----------
   var tabDashboardBtn = document.getElementById("tabDashboardBtn");
@@ -1452,6 +1451,7 @@
   // ---- check a specific date ----
   var dateLookupInput = document.getElementById("dateLookupInput");
   var dateLookupResult = document.getElementById("dateLookupResult");
+  var dateLookupChartInstance = null;
   dateLookupInput.max = todayStr();
 
   function renderDateLookup(dateStr){
@@ -1460,6 +1460,10 @@
 
     var entry = state.historyByDate[dateStr];
     if(!entry){
+      if(dateLookupChartInstance){
+        dateLookupChartInstance.destroy();
+        dateLookupChartInstance = null;
+      }
       var noneMsg = document.createElement("p");
       noneMsg.className = "text-[13px]";
       noneMsg.style.color = "var(--muted)";
@@ -1504,7 +1508,74 @@
     var starNode = buildStarRatingNode(counters);
     if(starNode) card.appendChild(starNode);
 
+    var chartWrap = document.createElement("div");
+    chartWrap.className = "relative mt-4";
+    chartWrap.style.height = "180px";
+    var canvas = document.createElement("canvas");
+    canvas.id = "dateLookupChartCanvas";
+    chartWrap.appendChild(canvas);
+    card.appendChild(chartWrap);
+
     dateLookupResult.appendChild(card);
+
+    if(dateLookupChartInstance){
+      dateLookupChartInstance.destroy();
+      dateLookupChartInstance = null;
+    }
+    if(typeof Chart !== "undefined"){
+      var gridColor = "#333B66";
+      var tickColor = "#7A81A8";
+      var ctx = canvas.getContext("2d");
+      dateLookupChartInstance = new Chart(ctx, {
+        type: "bar",
+        data: {
+          labels: ["Quants", "Reasoning", "Verbal"],
+          datasets: [
+            {
+              label: "Attempted",
+              data: [counters.quants||0, counters.reasoning||0, counters.verbal||0],
+              backgroundColor: ["#4FC3F7", "#FF6F91", "#6EE7B7"],
+              borderRadius: 3
+            },
+            {
+              label: "Goal",
+              data: [state.targets.quants||0, state.targets.reasoning||0, state.targets.verbal||0],
+              backgroundColor: "rgba(228,169,59,0.28)",
+              borderRadius: 3
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              display: true,
+              position: "bottom",
+              labels: { color: tickColor, boxWidth: 12, font: { size: 11 } }
+            },
+            tooltip: {
+              backgroundColor: "#181D3A",
+              titleColor: "#F3EFE4",
+              bodyColor: "#F3EFE4",
+              borderColor: gridColor,
+              borderWidth: 1
+            }
+          },
+          scales: {
+            x: {
+              grid: { color: gridColor, drawTicks: false },
+              ticks: { color: tickColor, font: { size: 11 } }
+            },
+            y: {
+              beginAtZero: true,
+              grid: { color: gridColor },
+              ticks: { color: tickColor, precision: 0, font: { size: 11 } }
+            }
+          }
+        }
+      });
+    }
   }
 
   dateLookupInput.addEventListener("change", function(){
