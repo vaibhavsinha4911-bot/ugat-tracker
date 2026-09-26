@@ -232,17 +232,11 @@
         <p class="serif text-[20px] leading-none" style="color:var(--paper);">Vaibhav's UGAT Tracker</p>
         <p class="text-[12px] mt-1" style="color:var(--muted);" id="todayDateLabel">&nbsp;</p>
       </div>
-      <button id="streakBadge" class="flex items-center gap-1.5 pl-3 pr-3.5 py-1.5" style="border:1px solid var(--line);">
+      <div id="streakBadge" class="flex items-center gap-1.5 pl-3 pr-3.5 py-1.5" style="border:1px solid var(--line);">
         <span class="fire text-lg">🔥</span>
         <span class="serif text-xl" id="streakCount" style="color:var(--gold);">0</span>
         <span class="text-[11px] mt-0.5" style="color:var(--muted);">day streak</span>
-      </button>
-    </div>
-
-    <div id="streakEditRow" class="flex items-center gap-2 justify-end mt-2" style="display:none;">
-      <input type="number" id="streakEditInput" min="0" class="text-[13px] px-2 py-1 w-20 bg-transparent outline-none" style="border:1px solid var(--line); color:var(--paper);">
-      <button id="streakEditSaveBtn" class="text-[11.5px] px-3 py-1" style="color:var(--gold); border:1px solid var(--gold-dim);">Save</button>
-      <button id="streakEditCancelBtn" class="text-[11.5px] px-3 py-1" style="color:var(--muted); border:1px solid var(--line);">Cancel</button>
+      </div>
     </div>
 
     <p class="serif text-[15.5px] mt-4 mb-3 leading-snug" style="color:var(--gold);">
@@ -416,6 +410,7 @@
 
   var STORAGE_KEY = "ugatPrepDashboard_v2";
   var OLD_STORAGE_KEY = "ugatPrepDashboard_v1";
+  var STREAK_THRESHOLD = 3;
 
   // Topics can be plain strings, or { label, subtopics:[...] } for a topic broken into checkable sub-items.
   var SUBJECTS = [
@@ -453,6 +448,17 @@
     "Complete a lecture / video session",
     "Open shop for Mom at 1:30 PM",
     "Digital marketing course — 1 session"
+  ];
+
+  var COMPLETION_QUOTES = [
+    "Discipline beats motivation.",
+    "Today is banked. On to tomorrow.",
+    "Small wins, stacked daily.",
+    "That's a wrap — well earned.",
+    "Consistency is the whole game.",
+    "Done is done. Proud of this one.",
+    "Another brick in the wall.",
+    "Full send, full day."
   ];
 
   function todayStr(d){
@@ -527,7 +533,8 @@
       tasks: DEFAULT_TASKS.map(function(t){ return { id: uid(), label:t, done:false }; }),
       completedToday: false,
       streak: 0,
-      lastCompletedDate: null,
+      streakMilestoneDate: null,
+      allDoneQuoteDate: null,
       countersDate: todayStr(),
       counters: { quants:0, reasoning:0, verbal:0 },
       totals: { quants:0, reasoning:0, verbal:0 },
@@ -564,6 +571,8 @@
       parsed.syllabus = buildSyllabusFromDefaults(parsed.syllabus);
       if(typeof parsed.streak !== "number") parsed.streak = 0;
       if(typeof parsed.completedToday !== "boolean") parsed.completedToday = false;
+      if(typeof parsed.streakMilestoneDate !== "string") parsed.streakMilestoneDate = null;
+      if(typeof parsed.allDoneQuoteDate !== "string") parsed.allDoneQuoteDate = null;
       if(typeof parsed.firstUsedDate !== "string") parsed.firstUsedDate = parsed.dailyTaskDate || todayStr();
       return parsed;
     }catch(e){
@@ -585,19 +594,47 @@
   rollOverDayIfNeeded();
 
   function upsertHistoryEntry(dateStr, patch){
-    var existing = state.historyByDate[dateStr] || { pct:0, completedAt:null, counters:{ quants:0, reasoning:0, verbal:0 } };
+    var existing = state.historyByDate[dateStr] || { pct:0, done:0, total:0, completedAt:null, counters:{ quants:0, reasoning:0, verbal:0 } };
     var mergedCounters = Object.assign({}, existing.counters || { quants:0, reasoning:0, verbal:0 }, patch.counters || {});
     state.historyByDate[dateStr] = Object.assign({}, existing, patch, { counters: mergedCounters });
   }
 
-  function snapshotHistoryFor(dateStr, tasksArr, completed, countersSnapshot){
+  function snapshotHistoryFor(dateStr, tasksArr, milestoneReached, countersSnapshot){
     var total = tasksArr.length;
     var done = tasksArr.filter(function(t){ return t.done; }).length;
     var pct = total ? Math.round((done/total)*100) : 0;
-    var patch = { pct: pct };
-    if(completed){ patch.completedAt = state.completionTimes[dateStr] || null; }
+    var patch = { pct: pct, done: done, total: total };
+    if(milestoneReached){ patch.completedAt = state.completionTimes[dateStr] || null; }
     if(countersSnapshot){ patch.counters = countersSnapshot; }
     upsertHistoryEntry(dateStr, patch);
+  }
+
+  // A day "counts" toward the streak once at least STREAK_THRESHOLD tasks are done that day.
+  function getDoneCountForDate(dateStr){
+    if(dateStr === state.dailyTaskDate){
+      return state.tasks.filter(function(t){ return t.done; }).length;
+    }
+    var entry = state.historyByDate[dateStr];
+    return entry ? (entry.done || 0) : 0;
+  }
+  function dateQualifiesForStreak(dateStr){
+    return getDoneCountForDate(dateStr) >= STREAK_THRESHOLD;
+  }
+
+  // Streak is always derived from the day-by-day record (today's live tasks + history), never hand-edited.
+  function computeStreak(){
+    var count = 0;
+    var d = state.dailyTaskDate;
+    if(!dateQualifiesForStreak(d)){
+      d = yesterdayOf(d);
+    }
+    var guard = 0;
+    while(dateQualifiesForStreak(d) && guard < 20000){
+      count++;
+      d = yesterdayOf(d);
+      guard++;
+    }
+    return count;
   }
 
   function rollOverDayIfNeeded(){
@@ -610,12 +647,10 @@
         verbal: state.counters.verbal || 0
       });
 
-      if(state.lastCompletedDate && state.lastCompletedDate !== today && state.lastCompletedDate !== yesterdayStr()){
-        state.streak = 0;
-      }
       state.tasks.forEach(function(t){ t.done = false; });
       state.dailyTaskDate = today;
       state.completedToday = false;
+      state.streak = computeStreak();
     }
     if(state.countersDate !== today){
       state.counters = { quants:0, reasoning:0, verbal:0 };
@@ -663,30 +698,7 @@
   var dailyPct = document.getElementById("dailyPct");
   var dailyStatusLine = document.getElementById("dailyStatusLine");
   var streakCountEl = document.getElementById("streakCount");
-
-  // ---- manual streak edit ----
   var streakBadge = document.getElementById("streakBadge");
-  var streakEditRow = document.getElementById("streakEditRow");
-  var streakEditInput = document.getElementById("streakEditInput");
-  var streakEditSaveBtn = document.getElementById("streakEditSaveBtn");
-  var streakEditCancelBtn = document.getElementById("streakEditCancelBtn");
-
-  streakBadge.addEventListener("click", function(){
-    streakEditInput.value = state.streak || 0;
-    streakEditRow.style.display = "flex";
-    streakEditInput.focus();
-  });
-  streakEditCancelBtn.addEventListener("click", function(){
-    streakEditRow.style.display = "none";
-  });
-  streakEditSaveBtn.addEventListener("click", function(){
-    var val = parseInt(streakEditInput.value, 10);
-    state.streak = (isNaN(val) || val < 0) ? 0 : val;
-    save();
-    streakCountEl.textContent = state.streak;
-    streakEditRow.style.display = "none";
-    showToast("Streak set to " + state.streak);
-  });
 
   function barColor(pct){
     if(pct < 40) return "var(--red)";
@@ -699,6 +711,176 @@
     if(pct < 40) return "#DD5B4E";
     if(pct < 75) return "#E3A63C";
     return "#4CA57A";
+  }
+
+  // ---------- CELEBRATIONS ----------
+  // Fire "blows out" center screen when the streak threshold is hit for the day, then flies up
+  // into the streak badge and pulses the (now-updated) count.
+  function playStreakFireCelebration(newStreakValue){
+    var reduced = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    var backdrop = document.createElement("div");
+    backdrop.setAttribute("aria-hidden", "true");
+    backdrop.style.position = "fixed";
+    backdrop.style.inset = "0";
+    backdrop.style.zIndex = "79";
+    backdrop.style.background = "rgba(8,10,24,0.55)";
+    backdrop.style.backdropFilter = "blur(1px)";
+    backdrop.style.opacity = "0";
+    backdrop.style.pointerEvents = "none";
+    backdrop.style.transition = "opacity .35s ease";
+    document.body.appendChild(backdrop);
+
+    var overlay = document.createElement("div");
+    overlay.setAttribute("aria-hidden", "true");
+    overlay.style.position = "fixed";
+    overlay.style.zIndex = "80";
+    overlay.style.left = "50%";
+    overlay.style.top = "42%";
+    overlay.style.transform = "translate(-50%,-50%) scale(0.4)";
+    overlay.style.opacity = "0";
+    overlay.style.display = "flex";
+    overlay.style.flexDirection = "column";
+    overlay.style.alignItems = "center";
+    overlay.style.pointerEvents = "none";
+    overlay.style.padding = "34px 44px";
+    overlay.style.background = "var(--ink-2)";
+    overlay.style.border = "1.5px solid var(--gold)";
+    overlay.style.borderRadius = "18px";
+    overlay.style.boxShadow = "0 0 0 1px rgba(228,169,59,0.15), 0 18px 60px rgba(228,169,59,0.35), 0 0 90px rgba(228,169,59,0.25)";
+    overlay.style.transition = "transform .4s cubic-bezier(.34,1.56,.64,1), opacity .35s ease";
+
+    var icon = document.createElement("div");
+    icon.style.fontSize = "108px";
+    icon.style.lineHeight = "1";
+    icon.textContent = "🔥";
+    var label = document.createElement("p");
+    label.className = "serif";
+    label.style.color = "var(--gold)";
+    label.style.fontSize = "22px";
+    label.style.fontWeight = "600";
+    label.style.marginTop = "16px";
+    label.style.whiteSpace = "nowrap";
+    label.textContent = "Streak day secured!";
+
+    overlay.appendChild(icon);
+    overlay.appendChild(label);
+    document.body.appendChild(overlay);
+
+    requestAnimationFrame(function(){
+      backdrop.style.opacity = "1";
+      overlay.style.opacity = "1";
+      overlay.style.transform = "translate(-50%,-50%) scale(1)";
+    });
+
+    function flyToBadge(){
+      var rect = streakBadge.getBoundingClientRect();
+      var targetX = rect.left + rect.width/2;
+      var targetY = rect.top + rect.height/2;
+      backdrop.style.transition = "opacity .6s ease";
+      backdrop.style.opacity = "0";
+      overlay.style.transition = "left .7s cubic-bezier(.55,0,.85,.35), top .7s cubic-bezier(.55,0,.85,.35), transform .7s cubic-bezier(.55,0,.85,.35), opacity .7s ease, padding .7s ease";
+      overlay.style.left = targetX + "px";
+      overlay.style.top = targetY + "px";
+      overlay.style.transform = "translate(-50%,-50%) scale(0.16)";
+      overlay.style.padding = "10px 14px";
+      overlay.style.opacity = "0";
+      label.style.opacity = "0";
+    }
+
+    var holdTime = reduced ? 400 : 3000;
+    var flightTime = reduced ? 50 : 700;
+
+    setTimeout(function(){
+      flyToBadge();
+      setTimeout(function(){
+        if(overlay.parentNode) overlay.parentNode.removeChild(overlay);
+        if(backdrop.parentNode) backdrop.parentNode.removeChild(backdrop);
+        streakCountEl.textContent = newStreakValue;
+        streakBadge.style.transition = "transform .25s ease";
+        streakBadge.style.transform = "scale(1.18)";
+        setTimeout(function(){ streakBadge.style.transform = "scale(1)"; }, 220);
+      }, flightTime);
+    }, holdTime);
+  }
+
+  // Short green quote when every task for the day is checked off.
+  function playAllDoneQuote(){
+    var reduced = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    var quote = COMPLETION_QUOTES[Math.floor(Math.random() * COMPLETION_QUOTES.length)];
+
+    var backdrop = document.createElement("div");
+    backdrop.setAttribute("aria-hidden", "true");
+    backdrop.style.position = "fixed";
+    backdrop.style.inset = "0";
+    backdrop.style.zIndex = "80";
+    backdrop.style.background = "rgba(8,10,24,0.6)";
+    backdrop.style.backdropFilter = "blur(1px)";
+    backdrop.style.opacity = "0";
+    backdrop.style.pointerEvents = "none";
+    backdrop.style.transition = "opacity .4s ease";
+    document.body.appendChild(backdrop);
+
+    var overlay = document.createElement("div");
+    overlay.setAttribute("aria-hidden", "true");
+    overlay.style.position = "fixed";
+    overlay.style.zIndex = "81";
+    overlay.style.left = "50%";
+    overlay.style.top = "50%";
+    overlay.style.transform = "translate(-50%,-50%) scale(0.8)";
+    overlay.style.opacity = "0";
+    overlay.style.padding = "30px 34px";
+    overlay.style.textAlign = "center";
+    overlay.style.maxWidth = "86vw";
+    overlay.style.pointerEvents = "none";
+    overlay.style.background = "var(--ink-2)";
+    overlay.style.border = "1.5px solid var(--green)";
+    overlay.style.borderRadius = "18px";
+    overlay.style.boxShadow = "0 0 0 1px rgba(76,165,122,0.18), 0 18px 60px rgba(76,165,122,0.35), 0 0 90px rgba(76,165,122,0.22)";
+    overlay.style.transition = "transform .45s cubic-bezier(.34,1.56,.64,1), opacity .4s ease";
+
+    var check = document.createElement("div");
+    check.style.fontSize = "44px";
+    check.style.lineHeight = "1";
+    check.style.color = "var(--green)";
+    check.textContent = "✓";
+
+    var p = document.createElement("p");
+    p.className = "serif";
+    p.style.color = "var(--green)";
+    p.style.fontSize = "26px";
+    p.style.fontWeight = "600";
+    p.style.lineHeight = "1.35";
+    p.style.marginTop = "12px";
+    p.textContent = quote;
+
+    var sub = document.createElement("p");
+    sub.style.color = "var(--paper-dim)";
+    sub.style.fontSize = "12.5px";
+    sub.style.marginTop = "8px";
+    sub.textContent = "All of today's tasks are done";
+
+    overlay.appendChild(check);
+    overlay.appendChild(p);
+    overlay.appendChild(sub);
+    document.body.appendChild(overlay);
+
+    requestAnimationFrame(function(){
+      backdrop.style.opacity = "1";
+      overlay.style.opacity = "1";
+      overlay.style.transform = "translate(-50%,-50%) scale(1)";
+    });
+
+    var holdTime = reduced ? 400 : 3000;
+    setTimeout(function(){
+      backdrop.style.opacity = "0";
+      overlay.style.opacity = "0";
+      overlay.style.transform = "translate(-50%,-50%) scale(0.92)";
+      setTimeout(function(){
+        if(overlay.parentNode) overlay.parentNode.removeChild(overlay);
+        if(backdrop.parentNode) backdrop.parentNode.removeChild(backdrop);
+      }, 450);
+    }, holdTime);
   }
 
   function moveTask(taskId, direction){
@@ -784,36 +966,47 @@
     var total = state.tasks.length;
     var done = state.tasks.filter(function(t){ return t.done; }).length;
     var pct = total ? Math.round((done/total)*100) : 0;
+    var today = state.dailyTaskDate;
 
     dailyBarFill.style.width = pct + "%";
     dailyBarFill.style.background = barColor(pct);
     dailyPct.textContent = pct + "%";
 
+    var wasCompletedToday = state.completedToday;
+    state.completedToday = total > 0 && done >= STREAK_THRESHOLD;
+
     if(total === 0){
       dailyStatusLine.textContent = "Add your first routine item below.";
     } else if(pct === 0){
       dailyStatusLine.textContent = "Nothing checked off yet.";
+    } else if(done < STREAK_THRESHOLD){
+      var remaining = STREAK_THRESHOLD - done;
+      dailyStatusLine.textContent = done + " of " + total + " done — " + remaining + " more to secure today's streak.";
     } else if(pct < 100){
       dailyStatusLine.textContent = done + " of " + total + " done — streak secured for today.";
     } else {
-      dailyStatusLine.textContent = "Full day logged. Streak extended.";
+      dailyStatusLine.textContent = "Full day logged. Streak day complete.";
     }
 
-    var today = todayStr();
-    if(total > 0 && done >= 1 && !state.completedToday){
-      state.completedToday = true;
+    // Milestone: crossing the streak threshold today (fires once per day).
+    if(state.completedToday && !wasCompletedToday){
       state.completionTimes[today] = timeNow();
-      if(state.lastCompletedDate === yesterdayStr()){
-        state.streak += 1;
-      } else if(state.lastCompletedDate !== today){
-        state.streak = 1;
-      }
-      state.lastCompletedDate = today;
-      showToast("Streak extended — now " + state.streak + (state.streak === 1 ? " day" : " days"));
-    } else if(done === 0 && state.completedToday){
-      state.completedToday = false;
     }
+    if(total > 0 && done >= STREAK_THRESHOLD && state.streakMilestoneDate !== today){
+      state.streakMilestoneDate = today;
+      var newStreak = computeStreak();
+      playStreakFireCelebration(newStreak);
+    }
+    state.streak = computeStreak();
     streakCountEl.textContent = state.streak;
+
+    // All tasks done today — short green celebration.
+    if(total > 0 && done === total && state.allDoneQuoteDate !== today){
+      state.allDoneQuoteDate = today;
+      playAllDoneQuote();
+    } else if(done < total && state.allDoneQuoteDate === today){
+      state.allDoneQuoteDate = null;
+    }
 
     snapshotHistoryFor(today, state.tasks, state.completedToday);
     save();
@@ -1270,6 +1463,7 @@
     dates.forEach(function(dateStr){
       var entry = state.historyByDate[dateStr];
       var counters = entry.counters || { quants:0, reasoning:0, verbal:0 };
+      var streakDay = (entry.done || 0) >= STREAK_THRESHOLD;
       var row = document.createElement("div");
       row.className = "history-row py-3.5";
 
@@ -1280,19 +1474,25 @@
       left.className = "flex items-center gap-2.5";
 
       var dot = document.createElement("span");
-      dot.className = "dot";
-      dot.style.background = barColor(entry.pct);
+      if(streakDay){
+        dot.textContent = "🔥";
+        dot.style.fontSize = "13px";
+        dot.setAttribute("aria-label","Counted toward streak");
+      } else {
+        dot.className = "dot";
+        dot.style.background = barColor(entry.pct);
+      }
       left.appendChild(dot);
 
       var dateWrap = document.createElement("div");
       var dLabel = document.createElement("p");
       dLabel.className = "text-[14px]";
       dLabel.style.color = "var(--paper)";
-      dLabel.textContent = prettyDate(dateStr) + (dateStr === todayStr() ? " · today" : "");
+      dLabel.textContent = prettyDate(dateStr) + (dateStr === state.dailyTaskDate ? " · today" : "");
       var tLabel = document.createElement("p");
       tLabel.className = "text-[12px] mt-0.5";
       tLabel.style.color = "var(--muted)";
-      tLabel.textContent = entry.completedAt ? ("Streak logged at " + entry.completedAt) : "No streak logged";
+      tLabel.textContent = (entry.done||0) + "/" + (entry.total||0) + " tasks" + (entry.completedAt ? (" · streak logged at " + entry.completedAt) : (streakDay ? "" : " · streak not secured"));
       dateWrap.appendChild(dLabel);
       dateWrap.appendChild(tLabel);
       left.appendChild(dateWrap);
@@ -1392,11 +1592,14 @@
         parsed.syllabus = buildSyllabusFromDefaults(parsed.syllabus);
         if(typeof parsed.streak !== "number") parsed.streak = 0;
         if(typeof parsed.completedToday !== "boolean") parsed.completedToday = false;
+        if(typeof parsed.streakMilestoneDate !== "string") parsed.streakMilestoneDate = null;
+        if(typeof parsed.allDoneQuoteDate !== "string") parsed.allDoneQuoteDate = null;
         if(typeof parsed.dailyTaskDate !== "string") parsed.dailyTaskDate = todayStr();
         if(typeof parsed.countersDate !== "string") parsed.countersDate = todayStr();
 
         state = parsed;
         rollOverDayIfNeeded();
+        state.streak = computeStreak();
         renderTasks();
         renderDailyProgress();
         renderCounters();
@@ -1482,7 +1685,7 @@
     var dLabel = document.createElement("p");
     dLabel.className = "text-[14px]";
     dLabel.style.color = "var(--paper)";
-    dLabel.textContent = prettyDate(dateStr) + (dateStr === todayStr() ? " · today" : "");
+    dLabel.textContent = prettyDate(dateStr) + (dateStr === state.dailyTaskDate ? " · today" : "");
     var pctLabel = document.createElement("span");
     pctLabel.className = "serif text-lg";
     pctLabel.style.color = barColor(entry.pct);
@@ -1494,7 +1697,8 @@
     var tLabel = document.createElement("p");
     tLabel.className = "text-[12px] mt-1";
     tLabel.style.color = "var(--muted)";
-    tLabel.textContent = entry.completedAt ? ("Streak logged at " + entry.completedAt) : "No streak logged that day";
+    var streakDay = (entry.done||0) >= STREAK_THRESHOLD;
+    tLabel.textContent = (entry.done||0) + "/" + (entry.total||0) + " tasks" + (streakDay ? " · 🔥 counted toward streak" : " · streak not secured");
     card.appendChild(tLabel);
 
     var qLine = document.createElement("p");
@@ -1725,6 +1929,7 @@
   }
 
   // ---------- init ----------
+  state.streak = computeStreak();
   renderTasks();
   renderDailyProgress();
   renderCounters();
