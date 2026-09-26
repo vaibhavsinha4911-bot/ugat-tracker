@@ -59,6 +59,7 @@
   }
   .chk.sm{width:19px;height:19px;min-width:19px;}
   .chk:checked{background:var(--gold);border-color:var(--gold);}
+  .chk.chk-red:checked{background:var(--red);border-color:var(--red);}
   .chk::before{
     content:"";
     width:12px;height:9px;
@@ -231,11 +232,17 @@
         <p class="serif text-[20px] leading-none" style="color:var(--paper);">Vaibhav's UGAT Tracker</p>
         <p class="text-[12px] mt-1" style="color:var(--muted);" id="todayDateLabel">&nbsp;</p>
       </div>
-      <div class="flex items-center gap-1.5 pl-3 pr-3.5 py-1.5" style="border:1px solid var(--line);">
+      <button id="streakBadge" class="flex items-center gap-1.5 pl-3 pr-3.5 py-1.5" style="border:1px solid var(--line);">
         <span class="fire text-lg">🔥</span>
         <span class="serif text-xl" id="streakCount" style="color:var(--gold);">0</span>
         <span class="text-[11px] mt-0.5" style="color:var(--muted);">day streak</span>
-      </div>
+      </button>
+    </div>
+
+    <div id="streakEditRow" class="flex items-center gap-2 justify-end mt-2" style="display:none;">
+      <input type="number" id="streakEditInput" min="0" class="text-[13px] px-2 py-1 w-20 bg-transparent outline-none" style="border:1px solid var(--line); color:var(--paper);">
+      <button id="streakEditSaveBtn" class="text-[11.5px] px-3 py-1" style="color:var(--gold); border:1px solid var(--gold-dim);">Save</button>
+      <button id="streakEditCancelBtn" class="text-[11.5px] px-3 py-1" style="color:var(--muted); border:1px solid var(--line);">Cancel</button>
     </div>
 
     <p class="serif text-[15.5px] mt-4 mb-3 leading-snug" style="color:var(--gold);">
@@ -375,6 +382,12 @@
       <p class="text-[11px] mt-2" style="color:var(--muted);">Swipe the charts sideways to scroll through more days.</p>
 
       <p id="trackEmpty" class="text-[13px] pt-10 text-center" style="color:var(--muted); display:none;">Log a few days of practice to see your trend here.</p>
+
+      <div class="mt-10 pt-6" style="border-top:1px solid var(--line);">
+        <h3 class="text-[13px] mb-3" style="color:var(--paper-dim);">Check a specific date</h3>
+        <input type="date" id="dateLookupInput" class="text-[14px] px-3 py-2 w-full bg-transparent outline-none" style="border:1px solid var(--line); color:var(--paper); color-scheme:dark;">
+        <div id="dateLookupResult" class="mt-4"></div>
+      </div>
     </section>
   </div>
 
@@ -652,6 +665,30 @@
   var dailyStatusLine = document.getElementById("dailyStatusLine");
   var streakCountEl = document.getElementById("streakCount");
 
+  // ---- manual streak edit ----
+  var streakBadge = document.getElementById("streakBadge");
+  var streakEditRow = document.getElementById("streakEditRow");
+  var streakEditInput = document.getElementById("streakEditInput");
+  var streakEditSaveBtn = document.getElementById("streakEditSaveBtn");
+  var streakEditCancelBtn = document.getElementById("streakEditCancelBtn");
+
+  streakBadge.addEventListener("click", function(){
+    streakEditInput.value = state.streak || 0;
+    streakEditRow.style.display = "flex";
+    streakEditInput.focus();
+  });
+  streakEditCancelBtn.addEventListener("click", function(){
+    streakEditRow.style.display = "none";
+  });
+  streakEditSaveBtn.addEventListener("click", function(){
+    var val = parseInt(streakEditInput.value, 10);
+    state.streak = (isNaN(val) || val < 0) ? 0 : val;
+    save();
+    streakCountEl.textContent = state.streak;
+    streakEditRow.style.display = "none";
+    showToast("Streak set to " + state.streak);
+  });
+
   function barColor(pct){
     if(pct < 40) return "var(--red)";
     if(pct < 75) return "var(--amber)";
@@ -710,7 +747,7 @@
 
       var cb = document.createElement("input");
       cb.type = "checkbox";
-      cb.className = "chk";
+      cb.className = "chk chk-red";
       cb.checked = task.done;
       cb.addEventListener("change", function(){
         task.done = cb.checked;
@@ -758,13 +795,13 @@
     } else if(pct === 0){
       dailyStatusLine.textContent = "Nothing checked off yet.";
     } else if(pct < 100){
-      dailyStatusLine.textContent = done + " of " + total + " done — keep going.";
+      dailyStatusLine.textContent = done + " of " + total + " done — streak secured for today.";
     } else {
       dailyStatusLine.textContent = "Full day logged. Streak extended.";
     }
 
     var today = todayStr();
-    if(total > 0 && pct === 100 && !state.completedToday){
+    if(total > 0 && done >= 1 && !state.completedToday){
       state.completedToday = true;
       state.completionTimes[today] = timeNow();
       if(state.lastCompletedDate === yesterdayStr()){
@@ -773,8 +810,8 @@
         state.streak = 1;
       }
       state.lastCompletedDate = today;
-      showToast("Day complete — streak is now " + state.streak);
-    } else if(pct < 100 && state.completedToday){
+      showToast("Streak extended — now " + state.streak + (state.streak === 1 ? " day" : " days"));
+    } else if(done === 0 && state.completedToday){
       state.completedToday = false;
     }
     streakCountEl.textContent = state.streak;
@@ -1173,6 +1210,46 @@
   var totalReasoningEl = document.getElementById("totalReasoningEl");
   var totalVerbalEl = document.getElementById("totalVerbalEl");
 
+  function fmtVsGoal(count, target){
+    return target > 0 ? (count + "/" + target) : String(count);
+  }
+
+  function buildStarRatingNode(counters){
+    var totalGoal = (state.targets.quants||0) + (state.targets.reasoning||0) + (state.targets.verbal||0);
+    if(totalGoal <= 0) return null;
+
+    var totalAttempted = (counters.quants||0) + (counters.reasoning||0) + (counters.verbal||0);
+    var ratio = totalAttempted / totalGoal;
+    var starValue = Math.round(ratio * 5 * 2) / 2; // nearest 0.5
+    var starCount = Math.max(5, Math.ceil(starValue));
+    var fillPct = starCount > 0 ? Math.min(100, (starValue / starCount) * 100) : 0;
+    var starsStr = new Array(starCount + 1).join("★");
+
+    var starWrap = document.createElement("div");
+    starWrap.className = "flex items-center gap-2 mt-2";
+
+    var starBox = document.createElement("div");
+    starBox.className = "star-rating";
+    var starsEmpty = document.createElement("div");
+    starsEmpty.className = "stars-empty";
+    starsEmpty.textContent = starsStr;
+    var starsFill = document.createElement("div");
+    starsFill.className = "stars-fill";
+    starsFill.style.width = fillPct + "%";
+    starsFill.textContent = starsStr;
+    starBox.appendChild(starsEmpty);
+    starBox.appendChild(starsFill);
+
+    var starValueLabel = document.createElement("span");
+    starValueLabel.className = "text-[11px]";
+    starValueLabel.style.color = "var(--gold)";
+    starValueLabel.textContent = starValue + (starValue === 1 ? " star" : " stars");
+
+    starWrap.appendChild(starBox);
+    starWrap.appendChild(starValueLabel);
+    return starWrap;
+  }
+
   function renderHistoryTotals(){
     totalQuantsEl.textContent = state.totals.quants || 0;
     totalReasoningEl.textContent = state.totals.reasoning || 0;
@@ -1216,7 +1293,7 @@
       var tLabel = document.createElement("p");
       tLabel.className = "text-[12px] mt-0.5";
       tLabel.style.color = "var(--muted)";
-      tLabel.textContent = entry.completedAt ? ("Completed at " + entry.completedAt) : "Not fully completed";
+      tLabel.textContent = entry.completedAt ? ("Streak logged at " + entry.completedAt) : "No streak logged";
       dateWrap.appendChild(dLabel);
       dateWrap.appendChild(tLabel);
       left.appendChild(dateWrap);
@@ -1233,46 +1310,15 @@
       var qLine = document.createElement("p");
       qLine.className = "text-[11.5px] mt-2 pl-[18px]";
       qLine.style.color = "var(--muted)";
-      function fmtVsGoal(count, target){
-        return target > 0 ? (count + "/" + target) : String(count);
-      }
       qLine.textContent = "Quants " + fmtVsGoal(counters.quants||0, state.targets.quants||0) +
         " · Reasoning " + fmtVsGoal(counters.reasoning||0, state.targets.reasoning||0) +
         " · Verbal " + fmtVsGoal(counters.verbal||0, state.targets.verbal||0);
       row.appendChild(qLine);
 
-      var totalGoal = (state.targets.quants||0) + (state.targets.reasoning||0) + (state.targets.verbal||0);
-      if(totalGoal > 0){
-        var totalAttempted = (counters.quants||0) + (counters.reasoning||0) + (counters.verbal||0);
-        var ratio = totalAttempted / totalGoal;
-        var starValue = Math.round(ratio * 5 * 2) / 2; // nearest 0.5
-        var starCount = Math.max(5, Math.ceil(starValue));
-        var fillPct = starCount > 0 ? Math.min(100, (starValue / starCount) * 100) : 0;
-        var starsStr = new Array(starCount + 1).join("★");
-
-        var starWrap = document.createElement("div");
-        starWrap.className = "flex items-center gap-2 mt-2 pl-[18px]";
-
-        var starBox = document.createElement("div");
-        starBox.className = "star-rating";
-        var starsEmpty = document.createElement("div");
-        starsEmpty.className = "stars-empty";
-        starsEmpty.textContent = starsStr;
-        var starsFill = document.createElement("div");
-        starsFill.className = "stars-fill";
-        starsFill.style.width = fillPct + "%";
-        starsFill.textContent = starsStr;
-        starBox.appendChild(starsEmpty);
-        starBox.appendChild(starsFill);
-
-        var starValueLabel = document.createElement("span");
-        starValueLabel.className = "text-[11px]";
-        starValueLabel.style.color = "var(--gold)";
-        starValueLabel.textContent = starValue + (starValue === 1 ? " star" : " stars");
-
-        starWrap.appendChild(starBox);
-        starWrap.appendChild(starValueLabel);
-        row.appendChild(starWrap);
+      var starNode = buildStarRatingNode(counters);
+      if(starNode){
+        starNode.classList.add("pl-[18px]");
+        row.appendChild(starNode);
       }
 
       historyList.appendChild(row);
@@ -1402,6 +1448,69 @@
       renderTrackCharts();
     });
   });
+
+  // ---- check a specific date ----
+  var dateLookupInput = document.getElementById("dateLookupInput");
+  var dateLookupResult = document.getElementById("dateLookupResult");
+  dateLookupInput.max = todayStr();
+
+  function renderDateLookup(dateStr){
+    dateLookupResult.innerHTML = "";
+    if(!dateStr) return;
+
+    var entry = state.historyByDate[dateStr];
+    if(!entry){
+      var noneMsg = document.createElement("p");
+      noneMsg.className = "text-[13px]";
+      noneMsg.style.color = "var(--muted)";
+      noneMsg.textContent = "No data recorded for " + prettyDate(dateStr) + ".";
+      dateLookupResult.appendChild(noneMsg);
+      return;
+    }
+
+    var counters = entry.counters || { quants:0, reasoning:0, verbal:0 };
+    var card = document.createElement("div");
+    card.className = "p-4";
+    card.style.border = "1px solid var(--line)";
+
+    var topRow = document.createElement("div");
+    topRow.className = "flex items-center justify-between";
+    var dLabel = document.createElement("p");
+    dLabel.className = "text-[14px]";
+    dLabel.style.color = "var(--paper)";
+    dLabel.textContent = prettyDate(dateStr) + (dateStr === todayStr() ? " · today" : "");
+    var pctLabel = document.createElement("span");
+    pctLabel.className = "serif text-lg";
+    pctLabel.style.color = barColor(entry.pct);
+    pctLabel.textContent = entry.pct + "%";
+    topRow.appendChild(dLabel);
+    topRow.appendChild(pctLabel);
+    card.appendChild(topRow);
+
+    var tLabel = document.createElement("p");
+    tLabel.className = "text-[12px] mt-1";
+    tLabel.style.color = "var(--muted)";
+    tLabel.textContent = entry.completedAt ? ("Streak logged at " + entry.completedAt) : "No streak logged that day";
+    card.appendChild(tLabel);
+
+    var qLine = document.createElement("p");
+    qLine.className = "text-[12.5px] mt-3";
+    qLine.style.color = "var(--muted)";
+    qLine.textContent = "Quants " + fmtVsGoal(counters.quants||0, state.targets.quants||0) +
+      " · Reasoning " + fmtVsGoal(counters.reasoning||0, state.targets.reasoning||0) +
+      " · Verbal " + fmtVsGoal(counters.verbal||0, state.targets.verbal||0);
+    card.appendChild(qLine);
+
+    var starNode = buildStarRatingNode(counters);
+    if(starNode) card.appendChild(starNode);
+
+    dateLookupResult.appendChild(card);
+  }
+
+  dateLookupInput.addEventListener("change", function(){
+    renderDateLookup(dateLookupInput.value);
+  });
+
 
   function buildTrackChartData(){
     var dates = Object.keys(state.historyByDate).sort(); // ascending
